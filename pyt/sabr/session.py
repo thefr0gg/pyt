@@ -112,6 +112,16 @@ _DEFAULT_BACKOFF_CAP = 30.0
 # this — they advance through the backoff path with the counter reset.
 _MAX_STALL_ROUNDS = 8
 
+# Separate, higher ceiling for rounds that produce zero bytes even WHILE
+# receiving a server backoff every round. _MAX_STALL_ROUNDS alone can't catch
+# this: a legitimate ad-enforcement pause resets that counter on every round,
+# by design, so a session that backs off forever without ever delivering a
+# single MEDIA_HEADER would otherwise loop indefinitely. Observed on real
+# traffic: a player response that reports playabilityStatus=OK with a SABR
+# URL, but whose SABR session only ever exchanges SELECTABLE_FORMATS /
+# PLAYBACK_START_POLICY / backoff, with zero media, forever.
+_MAX_NO_MEDIA_ROUNDS = 60
+
 # When NOT in an ad-enforcement window, cap the server's requested backoff to
 # this many ms. Without this cap, "target_readahead reached" backoffs slow VOD
 # downloads to real-time playback speed because the server enforces its
@@ -189,6 +199,11 @@ class SabrSession:
         # that DID receive a backoff signal does not increment this — that's an
         # ad-enforcement / playback-start delay, not a stall.
         self._stall_rounds = 0
+        # Counter of consecutive empty rounds regardless of backoff — catches
+        # a session that backs off forever without ever delivering media
+        # (see _MAX_NO_MEDIA_ROUNDS). Reset the moment any round produces
+        # bytes; unlike _stall_rounds, a backoff signal does NOT reset this.
+        self._no_media_rounds = 0
         # Optional playback cookie returned by NEXT_REQUEST_POLICY; included on
         # subsequent requests so the server keeps the same logical session.
         self._playback_cookie: Optional[bytes] = None
@@ -518,6 +533,20 @@ class SabrSession:
             if self._stall_rounds >= _MAX_STALL_ROUNDS:
                 raise SabrError(
                     f"SABR stalled: {_MAX_STALL_ROUNDS} consecutive empty rounds with no server backoff"
+                )
+
+        # Separate ceiling: a session that backs off on every single round
+        # without ever delivering media would never trip the check above
+        # (backoff resets _stall_rounds unconditionally, by design, to
+        # tolerate ad-enforcement pauses). This catches that case instead.
+        if produced_any:
+            self._no_media_rounds = 0
+        else:
+            self._no_media_rounds += 1
+            if self._no_media_rounds >= _MAX_NO_MEDIA_ROUNDS:
+                raise SabrError(
+                    f"SABR stalled: {_MAX_NO_MEDIA_ROUNDS} consecutive rounds "
+                    "with no media delivered, even with server backoff"
                 )
 
     # -- Helpers ---------------------------------------------------------------

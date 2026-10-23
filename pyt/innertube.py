@@ -67,20 +67,47 @@ _default_clients = {
         },
         "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
+    # VISIONOS does not require a PO token (same tier as ANDROID_VR) and
+    # is yt-dlp's current fallback for videos where ANDROID_VR's player
+    # response looks OK but the SABR session it returns never actually
+    # delivers media (observed on real traffic: repeated backoff/reload
+    # signals with no MEDIA_HEADER ever arriving).
+    "VISIONOS": {
+        "context": {
+            "client": {
+                "clientName": "VISIONOS",
+                "clientVersion": "1.02",
+                "deviceMake": "Apple",
+                "deviceModel": "RealityDevice17,1",
+                "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+                "osName": "visionOS",
+                "osVersion": "26.5.23O471",
+                "hl": "en",
+            }
+        },
+        "header": {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+            "X-Youtube-Client-Name": "101",
+            "X-Youtube-Client-Version": "1.02",
+        },
+        "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
+    },
     "ANDROID": {
         "context": {
             "client": {
                 "clientName": "ANDROID",
-                "clientVersion": "21.16.7",
-                "androidSdkVersion": 34,
+                "clientVersion": "21.26.364",
+                "androidSdkVersion": 30,
                 "hl": "en",
-                "userAgent": "com.google.android.youtube/21.16.7 (Linux; U; Android 14; en_US; Pixel 8; Build/UQ1A.240205.004; Cronet/113.0.5672.24)",
+                "userAgent": "com.google.android.youtube/21.26.364 (Linux; U; Android 11) gzip",
+                "osName": "Android",
+                "osVersion": "11",
             }
         },
         "header": {
-            "User-Agent": "com.google.android.youtube/21.16.7 (Linux; U; Android 14; en_US; Pixel 8; Build/UQ1A.240205.004; Cronet/113.0.5672.24)",
+            "User-Agent": "com.google.android.youtube/21.26.364 (Linux; U; Android 11) gzip",
             "X-Youtube-Client-Name": "3",
-            "X-Youtube-Client-Version": "21.16.7",
+            "X-Youtube-Client-Version": "21.26.364",
         },
         "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
@@ -88,16 +115,17 @@ _default_clients = {
         "context": {
             "client": {
                 "clientName": "IOS",
-                "clientVersion": "19.45.4",
+                "clientVersion": "21.26.4",
+                "deviceMake": "Apple",
                 "deviceModel": "iPhone16,2",
                 "hl": "en",
-                "userAgent": "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X)",
+                "userAgent": "com.google.ios.youtube/21.26.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)",
             }
         },
         "header": {
-            "User-Agent": "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X)",
+            "User-Agent": "com.google.ios.youtube/21.26.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)",
             "X-Youtube-Client-Name": "5",
-            "X-Youtube-Client-Version": "19.45.4",
+            "X-Youtube-Client-Version": "21.26.4",
         },
         "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },

@@ -74,7 +74,9 @@ class StreamRef:
         return self._raw.itag
 
     @property
-    def url(self) -> str:
+    def url(self) -> Optional[str]:
+        """Direct/signed CDN URL, or ``None`` for a SABR-only format —
+        one with no byte-range fallback available if SABR fails."""
         return self._raw.url
 
     @property

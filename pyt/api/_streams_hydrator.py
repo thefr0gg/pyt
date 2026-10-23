@@ -18,10 +18,15 @@ class _RawStream:
     """Pre-parsed fields from one entry in the player response's streamingData.
 
     Produced by :func:`hydrate_streams`; consumed by :class:`StreamRef`.
+
+    ``url`` is ``None`` for a SABR-only format — one with no direct/cipher
+    URL in the player response at all. Downloading it only works through
+    the SABR session (``CombinedDownload`` or ``Download``'s SABR path);
+    there's no byte-range fallback available if SABR fails.
     """
 
     itag: int
-    url: str
+    url: Optional[str]
     mime_type: str
     kind: str
     subtype: str
@@ -58,9 +63,11 @@ def _decode_ustreamer_config(player_response: dict) -> Optional[bytes]:
 def _parse_one(
     stream_dict: dict, duration: Optional[float], title: str
 ) -> Optional[_RawStream]:
+    # A format with no url/signatureCipher at all (and so none applied by
+    # apply_signature) is SABR-only, not unusable — only the byte-range
+    # fallback is unavailable for it. mimeType is still required below to
+    # parse codecs/kind, so there's nothing useful to build without that.
     url = stream_dict.get("url")
-    if not url:
-        return None
 
     itag = int(stream_dict.get("itag", 0))
     mime_raw = stream_dict.get("mimeType", "")

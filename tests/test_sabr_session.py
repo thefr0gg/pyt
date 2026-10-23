@@ -523,6 +523,28 @@ def test_empty_round_with_backoff_does_not_count_toward_stall():
     assert chunks == [(140, b"X")]
 
 
+def test_infinite_backoff_with_no_media_eventually_raises():
+    """A session that backs off on every round forever, never
+    delivering a single byte, must not loop indefinitely just because
+    _stall_rounds keeps getting reset by the backoff signal. Observed
+    on real traffic: a player response reports playabilityStatus=OK
+    with a SABR URL, but the SABR session only ever exchanges
+    SELECTABLE_FORMATS/PLAYBACK_START_POLICY/backoff with zero media."""
+    from pyt.sabr.session import _MAX_NO_MEDIA_ROUNDS
+
+    backoff_forever = [
+        make_next_request_policy(backoff_time_ms=10)
+        for _ in range(_MAX_NO_MEDIA_ROUNDS + 1)
+    ]
+    session = SabrSession(
+        sabr_url="https://sabr.test/play",
+        ustreamer_config=None,
+        formats=[(140, False)],
+    )
+    with pytest.raises(SabrError, match="no media delivered"):
+        _drive_session(session, backoff_forever)
+
+
 # ── gzip-encoded responses ──────────────────────────────────────────────
 
 

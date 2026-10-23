@@ -185,6 +185,13 @@ class Download:
         known_filesize = stream.filesize or stream.filesize_approx or 0
         bytes_remaining = known_filesize
 
+        sabr_url = sabr_cfg.sabr_url if sabr_cfg else None
+        if url is None and not sabr_url:
+            raise DownloadError(
+                f"itag {stream.itag}: no direct URL and no SABR URL available "
+                "for this stream"
+            )
+
         with open(file_path, "wb") as fh:
             # ── SABR path ──────────────────────────────────────────────────
             sabr_url = sabr_cfg.sabr_url if sabr_cfg else None
@@ -213,6 +220,11 @@ class Download:
                             sabr_cfg, stream, chunk, fh, bytes_remaining
                         )
                 except Exception as exc:
+                    if url is None:
+                        raise DownloadError(
+                            f"itag {stream.itag}: SABR failed ({exc}) and this "
+                            "stream has no direct URL to fall back to"
+                        ) from exc
                     logger.warning(
                         "SABR failed (%s), falling back to range download", exc
                     )
@@ -223,6 +235,13 @@ class Download:
                     if bytes_remaining == 0:
                         self._fire_complete(sabr_cfg, stream, file_path)
                         return file_path
+                    if url is None:
+                        raise DownloadError(
+                            f"itag {stream.itag}: SABR delivered "
+                            f"{known_filesize - bytes_remaining}/{known_filesize} "
+                            "bytes and this stream has no direct URL for the "
+                            "byte-range fallback"
+                        )
                     sabr_offset = known_filesize - bytes_remaining
                     logger.warning(
                         "SABR incomplete (%d bytes remaining); finishing with range",
