@@ -4,6 +4,7 @@ Each filter returns a new :class:`StreamSet` rather than mutating in place,
 so storing intermediate results in variables is cheap and doesn't leak
 mutation across call sites.
 """
+
 from __future__ import annotations
 
 import logging
@@ -12,7 +13,6 @@ from typing import TYPE_CHECKING, Callable, Iterator, List, Optional, Sequence, 
 
 from pyt.api.errors import NoMatchingStream
 from pyt.api._streams_hydrator import _RawStream
-
 
 logger = logging.getLogger(__name__)
 
@@ -285,7 +285,9 @@ class StreamSet(Sequence[StreamRef]):
                 if their_res is None or their_res < res_min:
                     return False
             if br_min is not None:
-                their_br = _parse_threshold(s.abr) or (s.bitrate // 1000 if s.bitrate else None)
+                their_br = _parse_threshold(s.abr) or (
+                    s.bitrate // 1000 if s.bitrate else None
+                )
                 if their_br is None or their_br < br_min:
                     return False
             return True
@@ -329,8 +331,8 @@ class StreamSet(Sequence[StreamRef]):
         """
         if not self._streams:
             logger.debug(
-                "StreamSet.best: no candidates after filter chain "
-                "(video_id=%s)", self._video.video_id,
+                "StreamSet.best: no candidates after filter chain " "(video_id=%s)",
+                self._video.video_id,
             )
             raise NoMatchingStream(
                 "no streams matched the current filters",
@@ -346,8 +348,13 @@ class StreamSet(Sequence[StreamRef]):
         logger.debug(
             "StreamSet.best: picked itag=%d kind=%s res=%s abr=%s subtype=%s "
             "(out of %d candidates) video_id=%s",
-            winner.itag, winner.kind, winner.resolution, winner.abr,
-            winner.subtype, len(self._streams), self._video.video_id,
+            winner.itag,
+            winner.kind,
+            winner.resolution,
+            winner.abr,
+            winner.subtype,
+            len(self._streams),
+            self._video.video_id,
         )
         return winner
 
@@ -390,7 +397,9 @@ class StreamSet(Sequence[StreamRef]):
         if prefer_resolution is not None:
             cap = _resolution_to_int(prefer_resolution)
             if cap is not None:
-                capped = [s for s in videos if (_resolution_to_int(s.resolution) or 0) <= cap]
+                capped = [
+                    s for s in videos if (_resolution_to_int(s.resolution) or 0) <= cap
+                ]
                 if capped:
                     videos = capped
 
@@ -419,9 +428,14 @@ class StreamSet(Sequence[StreamRef]):
         logger.info(
             "StreamSet.best_pair: video itag=%d res=%s codec=%s + "
             "audio itag=%d abr=%s codec=%s (prefer_resolution=%s, video_id=%s)",
-            video_stream.itag, video_stream.resolution, video_stream.video_codec,
-            audio_stream.itag, audio_stream.abr, audio_stream.audio_codec,
-            prefer_resolution, self._video.video_id,
+            video_stream.itag,
+            video_stream.resolution,
+            video_stream.video_codec,
+            audio_stream.itag,
+            audio_stream.abr,
+            audio_stream.audio_codec,
+            prefer_resolution,
+            self._video.video_id,
         )
         return video_stream, audio_stream
 

@@ -1,4 +1,5 @@
 """Tests for pyt.archive.DownloadArchive."""
+
 import os
 import threading
 
@@ -6,8 +7,8 @@ import pytest
 
 from pyt.archive import DownloadArchive
 
-
 # ── basic behaviour ───────────────────────────────────────────────────────────
+
 
 def test_new_archive_reports_not_downloaded(tmp_path):
     archive = DownloadArchive(str(tmp_path / "archive.txt"))
@@ -27,6 +28,7 @@ def test_unknown_id_still_false_after_marking_another(tmp_path):
 
 
 # ── file format ───────────────────────────────────────────────────────────────
+
 
 def test_file_written_in_ytdlp_format(tmp_path):
     path = tmp_path / "archive.txt"
@@ -56,6 +58,7 @@ def test_multiple_ids_each_on_own_line(tmp_path):
 
 # ── loading existing file ─────────────────────────────────────────────────────
 
+
 def test_loads_existing_archive(tmp_path):
     path = tmp_path / "archive.txt"
     path.write_text("youtube aaa\nyoutube bbb\n", encoding="utf-8")
@@ -66,8 +69,9 @@ def test_loads_existing_archive(tmp_path):
 
 def test_ignores_non_youtube_lines(tmp_path):
     path = tmp_path / "archive.txt"
-    path.write_text("# comment\nsome_other_service video123\nyoutube good1\n",
-                    encoding="utf-8")
+    path.write_text(
+        "# comment\nsome_other_service video123\nyoutube good1\n", encoding="utf-8"
+    )
     archive = DownloadArchive(str(path))
     assert archive.is_downloaded("good1") is True
     assert archive.is_downloaded("video123") is False
@@ -82,6 +86,7 @@ def test_missing_file_creates_on_first_write(tmp_path):
 
 
 # ── thread safety ─────────────────────────────────────────────────────────────
+
 
 def test_concurrent_marks_no_duplicates(tmp_path):
     path = tmp_path / "archive.txt"

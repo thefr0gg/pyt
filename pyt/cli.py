@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """pyt — YouTube downloader CLI."""
+
 import os
 import sys
 import json
@@ -48,40 +49,48 @@ _COLOUR = sys.stdout.isatty()
 if _COLOUR and sys.platform == "win32":
     os.system("")  # activate ENABLE_VIRTUAL_TERMINAL_PROCESSING
 
+
 def _c(code: str) -> str:
     return f"\033[{code}m" if _COLOUR else ""
 
-R  = _c("0")       # reset
-B  = _c("1")       # bold
-DM = _c("2")       # dim
-CY = _c("36")      # cyan
-GR = _c("32")      # green
-YL = _c("33")      # yellow
-RD = _c("31")      # red
-MG = _c("35")      # magenta
-BCY = _c("96")     # bright cyan
-BGN = _c("92")     # bright green
-BYL = _c("93")     # bright yellow
-BRD = _c("91")     # bright red
-BWH = _c("97")     # bright white
+
+R = _c("0")  # reset
+B = _c("1")  # bold
+DM = _c("2")  # dim
+CY = _c("36")  # cyan
+GR = _c("32")  # green
+YL = _c("33")  # yellow
+RD = _c("31")  # red
+MG = _c("35")  # magenta
+BCY = _c("96")  # bright cyan
+BGN = _c("92")  # bright green
+BYL = _c("93")  # bright yellow
+BRD = _c("91")  # bright red
+BWH = _c("97")  # bright white
 
 # ── Output helpers ────────────────────────────────────────────────────────────
+
 
 def _print_info(label: str, value: str) -> None:
     pad = 10
     sys.stdout.write(f"  {B}{BWH}{label:<{pad}}{R}  {value}\n")
 
+
 def _print_ok(msg: str) -> None:
     sys.stdout.write(f"\n  {BGN}+{R}  {msg}\n")
+
 
 def _print_err(msg: str) -> None:
     sys.stdout.write(f"\n  {BRD}x{R}  {msg}\n")
 
+
 def _print_warn(msg: str) -> None:
     sys.stdout.write(f"  {BYL}!{R}  {msg}\n")
 
+
 def _print_section(title: str) -> None:
     sys.stdout.write(f"\n  {B}{BCY}{title}{R}\n")
+
 
 def _fmt_bytes(n: int) -> str:
     """Human-readable byte count."""
@@ -93,6 +102,7 @@ def _fmt_bytes(n: int) -> str:
             return f"{n:.1f} {unit}"
     return f"{n:.1f} TB"
 
+
 def _fmt_seconds(secs: float) -> str:
     secs = int(secs)
     if secs < 60:
@@ -103,57 +113,62 @@ def _fmt_seconds(secs: float) -> str:
     h, m = divmod(m, 60)
     return f"{h}h {m:02d}m"
 
+
 def _fmt_duration(seconds: int) -> str:
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
 
 # ── Progress bar ──────────────────────────────────────────────────────────────
 
 _DL_STATE: dict = {}
 
 _BAR_WIDTH = 40
-_BAR_FULL  = "━"  # ━
+_BAR_FULL = "━"  # ━
 _BAR_EMPTY = "━"  # ━ (dimmed)
+
 
 def _clear_progress_line() -> None:
     cols = shutil.get_terminal_size().columns
     sys.stdout.write(f"\r{' ' * cols}\r")
     sys.stdout.flush()
 
-def _draw_progress(bytes_recv: int, filesize: int, speed: float, eta: float) -> None:
-    pct    = min(bytes_recv / filesize, 1.0) if filesize else 0
-    filled = int(_BAR_WIDTH * pct)
-    empty  = _BAR_WIDTH - filled
 
-    bar      = f"{BGN}{_BAR_FULL * filled}{R}{DM}{_BAR_EMPTY * empty}{R}"
+def _draw_progress(bytes_recv: int, filesize: int, speed: float, eta: float) -> None:
+    pct = min(bytes_recv / filesize, 1.0) if filesize else 0
+    filled = int(_BAR_WIDTH * pct)
+    empty = _BAR_WIDTH - filled
+
+    bar = f"{BGN}{_BAR_FULL * filled}{R}{DM}{_BAR_EMPTY * empty}{R}"
     size_str = f"{_fmt_bytes(bytes_recv)}/{_fmt_bytes(filesize)}"
-    spd_str  = f"{_fmt_bytes(int(speed))}/s" if speed > 0 else ""
-    eta_str  = f"eta {_fmt_seconds(eta)}" if eta > 0 and pct < 1 else ""
+    spd_str = f"{_fmt_bytes(int(speed))}/s" if speed > 0 else ""
+    eta_str = f"eta {_fmt_seconds(eta)}" if eta > 0 and pct < 1 else ""
 
     parts = [s for s in (size_str, spd_str, eta_str) if s]
-    meta  = "  ".join(parts)
+    meta = "  ".join(parts)
 
     sys.stdout.write(f"\r  {bar}  {DM}{meta}{R}  ")
     sys.stdout.flush()
 
 
 def on_progress(stream: Stream, chunk: bytes, bytes_remaining: int) -> None:
-    filesize   = stream.filesize
+    filesize = stream.filesize
     bytes_recv = filesize - bytes_remaining
-    now        = time.monotonic()
+    now = time.monotonic()
 
     if not _DL_STATE:
         _DL_STATE["start"] = now
 
     elapsed = now - _DL_STATE["start"]
-    speed   = bytes_recv / elapsed if elapsed > 0 else 0
-    eta     = bytes_remaining / speed if speed > 0 else 0
+    speed = bytes_recv / elapsed if elapsed > 0 else 0
+    eta = bytes_remaining / speed if speed > 0 else 0
 
     _draw_progress(bytes_recv, filesize, speed, eta)
 
 
 # ── Stream table ──────────────────────────────────────────────────────────────
+
 
 def display_streams(youtube: YouTube) -> None:
     streams = list(youtube.streams)
@@ -163,11 +178,11 @@ def display_streams(youtube: YouTube) -> None:
 
     _print_section(f"Available streams — {youtube.title}")
 
-    col_itag  = 6
-    col_type  = 14
-    col_fmt   = 6
-    col_qual  = 10
-    col_size  = 9
+    col_itag = 6
+    col_type = 14
+    col_fmt = 6
+    col_qual = 10
+    col_size = 9
 
     header = (
         f"  {DM}"
@@ -220,25 +235,27 @@ def display_streams(youtube: YouTube) -> None:
 
 # ── Video info header ─────────────────────────────────────────────────────────
 
+
 def _show_video_info(youtube: YouTube) -> None:
     try:
-        title  = youtube.title
+        title = youtube.title
         author = youtube.author
         length = _fmt_duration(youtube.length)
-        views  = f"{youtube.views:,}"
-        url    = youtube.watch_url
+        views = f"{youtube.views:,}"
+        url = youtube.watch_url
     except Exception:
         return
 
     sys.stdout.write("\n")
-    _print_info("Title",  f"{B}{BWH}{title}{R}")
+    _print_info("Title", f"{B}{BWH}{title}{R}")
     _print_info("Author", author)
     _print_info("Length", f"{length}  ·  Views  {views}")
-    _print_info("URL",    f"{DM}{url}{R}")
+    _print_info("URL", f"{DM}{url}{R}")
     sys.stdout.write("\n")
 
 
 # ── Post-processor chain ──────────────────────────────────────────────────────
+
 
 def _parse_categories(raw: str) -> List[str]:
     """Parse comma-separated SponsorBlock categories, or ``"all"``."""
@@ -266,9 +283,7 @@ def _build_pp_chain(args) -> list:
         if getattr(args, "embed_subs", False):
             _needs.append("--embed-subs")
         if _needs:
-            _print_warn(
-                f"ffmpeg not found — skipping: {', '.join(_needs)}"
-            )
+            _print_warn(f"ffmpeg not found — skipping: {', '.join(_needs)}")
             return pps
 
     # SponsorBlock mark (chapters, no re-encode — must run first)
@@ -333,6 +348,7 @@ def _run_pp_chain(pps: list, file_path: str, stream: Stream, youtube: YouTube) -
 
 # ── Output template resolution ────────────────────────────────────────────────
 
+
 def _resolve_output(
     template: Optional[OutputTemplate],
     youtube: YouTube,
@@ -358,6 +374,7 @@ def _resolve_output(
 
 
 # ── Download helpers ──────────────────────────────────────────────────────────
+
 
 def _download(
     stream: Stream,
@@ -412,6 +429,7 @@ def _unique_name(base: str, subtype: str, media_type: str, target: str) -> str:
 
 # ── Download commands ─────────────────────────────────────────────────────────
 
+
 def download_by_itag(
     youtube: YouTube,
     itag: int,
@@ -426,7 +444,9 @@ def download_by_itag(
         sys.exit(1)
     youtube.register_on_progress_callback(on_progress)
     try:
-        return _download(stream, target=target, filename=filename, pp_chain=pp_chain, youtube=youtube)
+        return _download(
+            stream, target=target, filename=filename, pp_chain=pp_chain, youtube=youtube
+        )
     except KeyboardInterrupt:
         sys.stdout.write("\n")
         _print_warn("Interrupted.")
@@ -447,7 +467,9 @@ def download_by_resolution(
         sys.exit(1)
     youtube.register_on_progress_callback(on_progress)
     try:
-        return _download(stream, target=target, filename=filename, pp_chain=pp_chain, youtube=youtube)
+        return _download(
+            stream, target=target, filename=filename, pp_chain=pp_chain, youtube=youtube
+        )
     except KeyboardInterrupt:
         sys.stdout.write("\n")
         _print_warn("Interrupted.")
@@ -467,7 +489,9 @@ def download_highest_resolution_progressive(
         _print_err(f"Video unavailable: {err}")
         sys.exit(1)
     try:
-        return _download(stream, target=target, filename=filename, pp_chain=pp_chain, youtube=youtube)
+        return _download(
+            stream, target=target, filename=filename, pp_chain=pp_chain, youtube=youtube
+        )
     except KeyboardInterrupt:
         sys.stdout.write("\n")
         _print_warn("Interrupted.")
@@ -482,9 +506,7 @@ def download_audio(
     filename: Optional[str] = None,
 ) -> Optional[str]:
     audio = (
-        youtube.streams.filter(only_audio=True, subtype=filetype)
-        .order_by("abr")
-        .last()
+        youtube.streams.filter(only_audio=True, subtype=filetype).order_by("abr").last()
     )
     if audio is None:
         _print_err(f"No {filetype} audio stream found. Available streams:")
@@ -492,7 +514,9 @@ def download_audio(
         sys.exit(1)
     youtube.register_on_progress_callback(on_progress)
     try:
-        return _download(audio, target=target, filename=filename, pp_chain=pp_chain, youtube=youtube)
+        return _download(
+            audio, target=target, filename=filename, pp_chain=pp_chain, youtube=youtube
+        )
     except KeyboardInterrupt:
         sys.stdout.write("\n")
         _print_warn("Interrupted.")
@@ -504,7 +528,7 @@ def download_caption(
 ) -> None:
     try:
         caption = youtube.captions[lang_code]
-        path    = caption.download(title=youtube.title, output_path=target)
+        path = caption.download(title=youtube.title, output_path=target)
         _print_ok(f"Caption saved to  {DM}{path}{R}")
     except KeyError:
         _print_err(f"No caption with code '{lang_code}'. Available:")
@@ -536,15 +560,12 @@ def ffmpeg_process(
             youtube.streams.filter(progressive=False, subtype="mp4")
             .order_by("resolution")
             .last()
-        ) or (
-            youtube.streams.filter(progressive=False)
-            .order_by("resolution")
-            .last()
-        )
+        ) or (youtube.streams.filter(progressive=False).order_by("resolution").last())
         if _best:
             video_stream = (
                 youtube.streams.filter(
-                    progressive=False, subtype="mp4",
+                    progressive=False,
+                    subtype="mp4",
                     resolution=_best.resolution,
                     custom_filter_functions=_is_avc,
                 ).first()
@@ -554,10 +575,14 @@ def ffmpeg_process(
     else:
         video_stream = (
             youtube.streams.filter(
-                progressive=False, resolution=resolution, subtype="mp4",
+                progressive=False,
+                resolution=resolution,
+                subtype="mp4",
                 custom_filter_functions=_is_avc,
             ).first()
-            or youtube.streams.filter(progressive=False, resolution=resolution, subtype="mp4").first()
+            or youtube.streams.filter(
+                progressive=False, resolution=resolution, subtype="mp4"
+            ).first()
             or youtube.streams.filter(progressive=False, resolution=resolution).first()
         )
 
@@ -592,7 +617,7 @@ def _ffmpeg_downloader(
     youtube: Optional[YouTube] = None,
     final_filename: Optional[str] = None,
 ) -> Optional[str]:
-    base       = safe_filename(video_stream.title)
+    base = safe_filename(video_stream.title)
     video_name = _unique_name(base, video_stream.subtype, "video", target)
     audio_name = _unique_name(base, audio_stream.subtype, "audio", target)
 
@@ -654,21 +679,32 @@ def _ffmpeg_downloader(
         _print_err("ffmpeg not found on PATH; cannot merge.")
         sys.exit(1)
     cmd = [
-        ffmpeg_bin, "-y",
-        "-loglevel", "warning", "-nostats",
+        ffmpeg_bin,
+        "-y",
+        "-loglevel",
+        "warning",
+        "-nostats",
         # Drop corrupt packets rather than halting on the first bad one.
         # Without these, libdav1d giving up on a truncated AV1 stream
         # leaves the muxer with a 4-second output from a 2-minute source
         # (silently — exit code is still 0). See pyt.api._merge for the
         # same hardening in the modern path.
-        "-fflags", "+discardcorrupt",
-        "-err_detect", "ignore_err",
-        "-i", video_path,
-        "-i", audio_path,
-        "-map", "0:v:0",
-        "-map", "1:a:0",
-        "-c:v", "copy",
-        "-c:a", "copy",
+        "-fflags",
+        "+discardcorrupt",
+        "-err_detect",
+        "ignore_err",
+        "-i",
+        video_path,
+        "-i",
+        audio_path,
+        "-map",
+        "0:v:0",
+        "-map",
+        "1:a:0",
+        "-c:v",
+        "copy",
+        "-c:a",
+        "copy",
     ]
     if merge_ext == "mp4":
         cmd += ["-movflags", "+faststart"]
@@ -693,6 +729,7 @@ def _ffmpeg_downloader(
     # catch the silently-truncated case where we'd otherwise tell the user
     # "Saved" for a 4-second clip from a 2-minute video.
     from pyt.api._merge import probe_duration
+
     out_dur = probe_duration(Path(final_path))
     if out_dur is not None:
         in_durs = [probe_duration(Path(p)) for p in (video_path, audio_path)]
@@ -755,12 +792,16 @@ def build_playback_report(youtube: YouTube) -> None:
     ts = int(dt.datetime.now(dt.UTC).timestamp())
     fp = os.path.join(os.getcwd(), f"yt-video-{youtube.video_id}-{ts}.json.gz")
     with gzip.open(fp, "wb") as fh:
-        fh.write(json.dumps({
-            "url":        youtube.watch_url,
-            "js":         youtube.js,
-            "watch_html": youtube.watch_html,
-            "video_info": youtube.vid_info,
-        }).encode("utf-8"))
+        fh.write(
+            json.dumps(
+                {
+                    "url": youtube.watch_url,
+                    "js": youtube.js,
+                    "watch_html": youtube.watch_html,
+                    "video_info": youtube.vid_info,
+                }
+            ).encode("utf-8")
+        )
     _print_ok(f"Playback report saved to  {DM}{fp}{R}")
 
 
@@ -768,26 +809,28 @@ def dump_json(youtube: YouTube) -> None:
     """Print video metadata as JSON without downloading."""
     try:
         info = {
-            "id":           youtube.video_id,
-            "title":        youtube.title,
-            "author":       youtube.author,
-            "channel_id":   youtube.channel_id,
-            "channel_url":  youtube.channel_url,
-            "length":       youtube.length,
-            "views":        youtube.views,
-            "publish_date": youtube.publish_date.isoformat() if youtube.publish_date else None,
-            "description":  youtube.description,
-            "keywords":     youtube.keywords,
+            "id": youtube.video_id,
+            "title": youtube.title,
+            "author": youtube.author,
+            "channel_id": youtube.channel_id,
+            "channel_url": youtube.channel_url,
+            "length": youtube.length,
+            "views": youtube.views,
+            "publish_date": (
+                youtube.publish_date.isoformat() if youtube.publish_date else None
+            ),
+            "description": youtube.description,
+            "keywords": youtube.keywords,
             "thumbnail_url": youtube.thumbnail_url,
-            "watch_url":    youtube.watch_url,
+            "watch_url": youtube.watch_url,
             "streams": [
                 {
-                    "itag":       s.itag,
-                    "mime_type":  s.mime_type,
+                    "itag": s.itag,
+                    "mime_type": s.mime_type,
                     "resolution": s.resolution,
-                    "fps":        getattr(s, "fps", None),
-                    "abr":        s.abr,
-                    "filesize":   s.filesize_approx,
+                    "fps": getattr(s, "fps", None),
+                    "abr": s.abr,
+                    "filesize": s.filesize_approx,
                     "is_progressive": s.is_progressive,
                 }
                 for s in youtube.streams
@@ -802,6 +845,7 @@ def dump_json(youtube: YouTube) -> None:
 
 # ── Sleep between downloads ───────────────────────────────────────────────────
 
+
 def _sleep_between(args) -> None:
     lo = float(getattr(args, "sleep_interval", None) or 0)
     hi = float(getattr(args, "max_sleep_interval", None) or lo)
@@ -813,6 +857,7 @@ def _sleep_between(args) -> None:
 
 
 # ── Help ─────────────────────────────────────────────────────────────────────
+
 
 def _print_help() -> None:
     W = shutil.get_terminal_size().columns
@@ -846,13 +891,19 @@ def _print_help() -> None:
 
     sec("After download")
     row("-x", "Extract audio track", "needs ffmpeg")
-    row("--audio-format FMT", "mp3  m4a  aac  flac  opus  vorbis  wav  alac", "default: mp3")
+    row(
+        "--audio-format FMT",
+        "mp3  m4a  aac  flac  opus  vorbis  wav  alac",
+        "default: mp3",
+    )
     row("--embed-metadata", "Write title, artist, date into the file", "needs ffmpeg")
     row("--embed-thumbnail", "Attach cover art", "needs ffmpeg")
     row("--embed-subs", "Mux subtitle track in  (pair with -c)", "needs ffmpeg")
     row("--sponsorblock-mark CATS", "Add SponsorBlock chapter markers")
     row("--sponsorblock-remove CATS", "Cut SponsorBlock segments out  (re-encodes)")
-    sys.stdout.write(f"    {DM}categories: sponsor intro outro selfpromo preview filler interaction music_offtopic hook  / all{R}\n")
+    sys.stdout.write(
+        f"    {DM}categories: sponsor intro outro selfpromo preview filler interaction music_offtopic hook  / all{R}\n"
+    )
 
     sec("Subtitles & captions")
     row("-c LANG", "Download or embed captions  e.g. en, fr, de")
@@ -861,14 +912,21 @@ def _print_help() -> None:
     sec("Save as")
     row("-t DIR", "Output directory", "default: current dir")
     row("-o TEMPLATE", "Filename template")
-    sys.stdout.write(f"    {DM}e.g.  {{author}}/{{upload_date:%Y-%m-%d}} - {{title}}.{{ext}}{R}\n")
-    sys.stdout.write(f"    {DM}fields: title  id  author  channel_id  upload_date  ext  resolution  fps  abr  filesize  playlist_index  playlist_title{R}\n")
+    sys.stdout.write(
+        f"    {DM}e.g.  {{author}}/{{upload_date:%Y-%m-%d}} - {{title}}.{{ext}}{R}\n"
+    )
+    sys.stdout.write(
+        f"    {DM}fields: title  id  author  channel_id  upload_date  ext  resolution  fps  abr  filesize  playlist_index  playlist_title{R}\n"
+    )
     row("-j", "Print video info as JSON, skip download")
 
     sec("Connection")
     row("--proxy URL", "socks5://host:port  or  http://user:pass@host:port")
     row("--cookies FILE", "Netscape cookie file")
-    row("--cookies-from-browser B", "Pull cookies from  chrome  firefox  brave  edge  safari")
+    row(
+        "--cookies-from-browser B",
+        "Pull cookies from  chrome  firefox  brave  edge  safari",
+    )
     row("--geo-bypass", "Spoof X-Forwarded-For header")
     row("--geo-bypass-country CC", "Specific country code  e.g. US, DE")
 
@@ -885,11 +943,14 @@ def _print_help() -> None:
     row("--version", "Print version and exit")
 
     gap()
-    sys.stdout.write(f"  {DM}Config file:  ~/.pyt.conf  or  ./pyt.conf  (INI, [default] section){R}\n")
+    sys.stdout.write(
+        f"  {DM}Config file:  ~/.pyt.conf  or  ./pyt.conf  (INI, [default] section){R}\n"
+    )
     gap()
 
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
+
 
 def _parse_args(
     parser: argparse.ArgumentParser, args: Optional[List] = None
@@ -917,11 +978,13 @@ def _parse_args(
     parser.add_argument("--cookies", metavar="FILE")
     parser.add_argument("--cookies-from-browser", metavar="BROWSER")
     parser.add_argument(
-        "--po-token", metavar="TOKEN",
+        "--po-token",
+        metavar="TOKEN",
         help="Proof-of-origin token (base64url). Obtain with: yt-dlp --get-po-token <url>",
     )
     parser.add_argument(
-        "--po-token-cmd", metavar="CMD",
+        "--po-token-cmd",
+        metavar="CMD",
         help=(
             "Command that prints a PO token to stdout. Run on first use "
             "and on every ATTESTATION_REQUIRED retry. Example: "
@@ -929,7 +992,8 @@ def _parse_args(
         ),
     )
     parser.add_argument(
-        "--po-token-script", metavar="FILE",
+        "--po-token-script",
+        metavar="FILE",
         help=(
             "Path to a JS script that prints a PO token. Runs with the "
             "first available JS runtime on PATH (node / bun / deno). "
@@ -945,7 +1009,10 @@ def _parse_args(
     # `-v` enables DEBUG-level logging; `-vv` adds TRACE (per-chunk /
     # per-HTTP-call detail, very loud).
     parser.add_argument(
-        "-v", "--verbose", action="count", default=0,
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
         help="increase log verbosity. -v=DEBUG, -vv=TRACE",
     )
     parser.add_argument("--logfile", metavar="FILE")
@@ -962,13 +1029,14 @@ def _parse_args(
         "--install",
         metavar="TOOL",
         help="install a tool to ~/.pyt/bin (use with --doctor). "
-             "Choices: ffmpeg, realesrgan, all",
+        "Choices: ffmpeg, realesrgan, all",
     )
 
     return parser.parse_args(args)
 
 
 # ── Single-video processing ───────────────────────────────────────────────────
+
 
 def _perform_args_on_youtube(
     youtube: YouTube,
@@ -995,11 +1063,20 @@ def _perform_args_on_youtube(
         _print_warn(f"Skipping  {DM}{youtube.video_id}{R}  (already in archive)")
         return
 
-    no_action = not any([
-        args.list, args.list_captions, args.build_playback_report, args.dump_json,
-        args.itag, args.caption_code, args.resolution, args.audio, args.ffmpeg,
-        args.extract_audio,
-    ])
+    no_action = not any(
+        [
+            args.list,
+            args.list_captions,
+            args.build_playback_report,
+            args.dump_json,
+            args.itag,
+            args.caption_code,
+            args.resolution,
+            args.audio,
+            args.ffmpeg,
+            args.extract_audio,
+        ]
+    )
 
     _show_video_info(youtube)
 
@@ -1017,7 +1094,9 @@ def _perform_args_on_youtube(
 
     # Caption download (standalone, not post-processing)
     if args.caption_code and not args.embed_subs:
-        download_caption(youtube=youtube, lang_code=args.caption_code, target=args.target)
+        download_caption(
+            youtube=youtube, lang_code=args.caption_code, target=args.target
+        )
 
     # Build post-processor chain once
     pp_chain = _build_pp_chain(args)
@@ -1025,7 +1104,9 @@ def _perform_args_on_youtube(
     def _resolve(stream):
         if template is None:
             return args.target, None
-        return _resolve_output(template, youtube, stream, args.target, playlist_index, playlist_title)
+        return _resolve_output(
+            template, youtube, stream, args.target, playlist_index, playlist_title
+        )
 
     if args.itag:
         if template:
@@ -1033,7 +1114,13 @@ def _perform_args_on_youtube(
             out_dir, fname = _resolve(s) if s else (args.target, None)
         else:
             out_dir, fname = args.target, None
-        download_by_itag(youtube=youtube, itag=args.itag, target=out_dir, pp_chain=pp_chain, filename=fname)
+        download_by_itag(
+            youtube=youtube,
+            itag=args.itag,
+            target=out_dir,
+            pp_chain=pp_chain,
+            filename=fname,
+        )
 
     if args.resolution:
         if template:
@@ -1041,31 +1128,60 @@ def _perform_args_on_youtube(
             out_dir, fname = _resolve(s) if s else (args.target, None)
         else:
             out_dir, fname = args.target, None
-        download_by_resolution(youtube=youtube, resolution=args.resolution, target=out_dir, pp_chain=pp_chain, filename=fname)
+        download_by_resolution(
+            youtube=youtube,
+            resolution=args.resolution,
+            target=out_dir,
+            pp_chain=pp_chain,
+            filename=fname,
+        )
 
     if args.audio:
         if template:
-            s = youtube.streams.filter(only_audio=True, subtype=args.audio).order_by("abr").last()
+            s = (
+                youtube.streams.filter(only_audio=True, subtype=args.audio)
+                .order_by("abr")
+                .last()
+            )
             out_dir, fname = _resolve(s) if s else (args.target, None)
         else:
             out_dir, fname = args.target, None
-        download_audio(youtube=youtube, filetype=args.audio, target=out_dir, pp_chain=pp_chain, filename=fname)
+        download_audio(
+            youtube=youtube,
+            filetype=args.audio,
+            target=out_dir,
+            pp_chain=pp_chain,
+            filename=fname,
+        )
 
     if args.ffmpeg:
         if template:
             vs = (
-                youtube.streams.filter(progressive=False, subtype="mp4").order_by("resolution").last()
-                or youtube.streams.filter(progressive=False).order_by("resolution").last()
+                youtube.streams.filter(progressive=False, subtype="mp4")
+                .order_by("resolution")
+                .last()
+                or youtube.streams.filter(progressive=False)
+                .order_by("resolution")
+                .last()
             )
             out_dir, final_name = _resolve(vs) if vs else (args.target, None)
         else:
             out_dir, final_name = args.target, None
         ffmpeg_process(
-            youtube=youtube, resolution=args.ffmpeg, target=out_dir,
-            pp_chain=pp_chain, final_filename=final_name,
+            youtube=youtube,
+            resolution=args.ffmpeg,
+            target=out_dir,
+            pp_chain=pp_chain,
+            final_filename=final_name,
         )
 
-    if args.extract_audio and not args.audio and not args.ffmpeg and not args.resolution and not args.itag:
+    if (
+        args.extract_audio
+        and not args.audio
+        and not args.ffmpeg
+        and not args.resolution
+        and not args.itag
+    ):
         audio_stream = youtube.streams.filter(only_audio=True).order_by("abr").last()
         if audio_stream is None:
             _print_err("No audio stream found.")
@@ -1073,7 +1189,13 @@ def _perform_args_on_youtube(
         out_dir, fname = _resolve(audio_stream)
         youtube.register_on_progress_callback(on_progress)
         try:
-            _download(audio_stream, target=out_dir, filename=fname, pp_chain=pp_chain, youtube=youtube)
+            _download(
+                audio_stream,
+                target=out_dir,
+                filename=fname,
+                pp_chain=pp_chain,
+                youtube=youtube,
+            )
         except KeyboardInterrupt:
             sys.stdout.write("\n")
             _print_warn("Interrupted.")
@@ -1083,18 +1205,27 @@ def _perform_args_on_youtube(
         if shutil.which("ffmpeg"):
             if template:
                 vs = (
-                    youtube.streams.filter(progressive=False, subtype="mp4").order_by("resolution").last()
-                    or youtube.streams.filter(progressive=False).order_by("resolution").last()
+                    youtube.streams.filter(progressive=False, subtype="mp4")
+                    .order_by("resolution")
+                    .last()
+                    or youtube.streams.filter(progressive=False)
+                    .order_by("resolution")
+                    .last()
                 )
                 out_dir, final_name = _resolve(vs) if vs else (args.target, None)
             else:
                 out_dir, final_name = args.target, None
             ffmpeg_process(
-                youtube=youtube, resolution="best", target=out_dir,
-                pp_chain=pp_chain, final_filename=final_name,
+                youtube=youtube,
+                resolution="best",
+                target=out_dir,
+                pp_chain=pp_chain,
+                final_filename=final_name,
             )
         else:
-            _print_warn("ffmpeg not found — falling back to best progressive stream (max 720p)")
+            _print_warn(
+                "ffmpeg not found — falling back to best progressive stream (max 720p)"
+            )
             if template:
                 s = youtube.streams.get_highest_resolution()
                 out_dir, fname = _resolve(s) if s else (args.target, None)
@@ -1110,6 +1241,7 @@ def _perform_args_on_youtube(
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
+
 
 def _iter_batch_urls(path: str) -> List[str]:
     """Read URLs from a batch file (one per line, # comments stripped)."""
@@ -1130,16 +1262,16 @@ def _resolve_po_token(args) -> Optional[str]:
     Use the modern :class:`pyt.Client` API for auto-retry.
     """
     set_count = sum(
-        1 for v in (
+        1
+        for v in (
             getattr(args, "po_token", None),
             getattr(args, "po_token_cmd", None),
             getattr(args, "po_token_script", None),
-        ) if v
+        )
+        if v
     )
     if set_count > 1:
-        _print_err(
-            "pass at most one of: --po-token, --po-token-cmd, --po-token-script"
-        )
+        _print_err("pass at most one of: --po-token, --po-token-cmd, --po-token-script")
         sys.exit(1)
 
     if getattr(args, "po_token", None):
@@ -1147,6 +1279,7 @@ def _resolve_po_token(args) -> Optional[str]:
 
     if getattr(args, "po_token_cmd", None):
         from pyt.api.po_token import CommandProvider
+
         try:
             sys.stdout.write(f"  {DM}Generating PO token via command …{R}\n")
             return CommandProvider(args.po_token_cmd).get()
@@ -1156,6 +1289,7 @@ def _resolve_po_token(args) -> Optional[str]:
 
     if getattr(args, "po_token_script", None):
         from pyt.api.po_token import ScriptProvider
+
         try:
             sys.stdout.write(f"  {DM}Generating PO token via JS script …{R}\n")
             return ScriptProvider(args.po_token_script).get()
@@ -1170,6 +1304,7 @@ def _setup_cookies(args) -> None:
     """Install cookies into pyt's request layer if requested."""
     if getattr(args, "cookies", None):
         from pyt.cookies import install_cookies, load_cookies_from_file
+
         try:
             install_cookies(load_cookies_from_file(args.cookies))
             _print_ok(f"Loaded cookies from  {DM}{args.cookies}{R}")
@@ -1178,6 +1313,7 @@ def _setup_cookies(args) -> None:
             sys.exit(1)
     elif getattr(args, "cookies_from_browser", None):
         from pyt.cookies import install_cookies, load_cookies_from_browser
+
         try:
             install_cookies(load_cookies_from_browser(args.cookies_from_browser))
             _print_ok(f"Loaded cookies from  {DM}{args.cookies_from_browser}{R}")
@@ -1188,7 +1324,9 @@ def _setup_cookies(args) -> None:
 
 def _setup_geo_bypass(args) -> None:
     """Add X-Forwarded-For header for geo-bypass."""
-    if not getattr(args, "geo_bypass", False) and not getattr(args, "geo_bypass_country", None):
+    if not getattr(args, "geo_bypass", False) and not getattr(
+        args, "geo_bypass_country", None
+    ):
         return
 
     import ipaddress
@@ -1205,9 +1343,11 @@ def _setup_geo_bypass(args) -> None:
     cc = (getattr(args, "geo_bypass_country", None) or "US").upper()
     cidr = _COUNTRY_RANGES.get(cc, "104.16.0.0/12")
     net = ipaddress.IPv4Network(cidr)
-    fake_ip = str(ipaddress.IPv4Address(
-        _random.randint(int(net.network_address), int(net.broadcast_address))
-    ))
+    fake_ip = str(
+        ipaddress.IPv4Address(
+            _random.randint(int(net.network_address), int(net.broadcast_address))
+        )
+    )
 
     _orig = request._execute_request
 
@@ -1215,6 +1355,7 @@ def _setup_geo_bypass(args) -> None:
         h = dict(headers or {})
         h["X-Forwarded-For"] = fake_ip
         import socket
+
         t = socket._GLOBAL_DEFAULT_TIMEOUT if ... is timeout else timeout
         return _orig(url, method=method, headers=h, data=data, timeout=t)
 
@@ -1225,15 +1366,20 @@ def _setup_geo_bypass(args) -> None:
 def _is_channel_url(url: str) -> bool:
     """Return True if *url* looks like a YouTube channel (not a video or playlist)."""
     from urllib.parse import urlparse
+
     path = urlparse(url).path.rstrip("/")
     parts = path.split("/")
     # /@handle  /channel/UCxxx  /c/name  /user/name
     return (
-        any(p.startswith("@") for p in parts)
-        or "channel" in parts
-        or "c" in parts
-        or "user" in parts
-    ) and "watch" not in parts and "playlist" not in parts
+        (
+            any(p.startswith("@") for p in parts)
+            or "channel" in parts
+            or "c" in parts
+            or "user" in parts
+        )
+        and "watch" not in parts
+        and "playlist" not in parts
+    )
 
 
 def _run_doctor(args) -> int:
@@ -1282,7 +1428,9 @@ def _run_doctor(args) -> int:
             if total:
                 pct = int(100 * done / total)
                 if pct != last_pct[0]:
-                    sys.stdout.write(f"\r  download: {pct}%  ({done / 1e6:.1f}/{total / 1e6:.1f} MB)")
+                    sys.stdout.write(
+                        f"\r  download: {pct}%  ({done / 1e6:.1f}/{total / 1e6:.1f} MB)"
+                    )
                     sys.stdout.flush()
                     last_pct[0] = pct
             else:
@@ -1317,12 +1465,14 @@ def main() -> None:
         # `-v` -> DEBUG (most actions, tool decisions, timings)
         # `-vv` -> TRACE (per-chunk SABR, per-HTTP-call, very loud)
         from pyt.api._logging import TRACE
+
         level = TRACE if args.verbose >= 2 else logging.DEBUG
         setup_logger(level, log_filename=args.logfile)
         # Modern API uses the public log-control API; route the same
         # CLI verbosity through it so consumers of pyt.api see the
         # same level the legacy paths see.
         from pyt.api._logging import enable_logging
+
         enable_logging(level=level, file=args.logfile)
         logger.debug("pyt %s (verbosity=%d)", __version__, args.verbose)
 
@@ -1383,7 +1533,10 @@ def main() -> None:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore", DeprecationWarning)
                     channel = Channel(url)
-                playlist_title = getattr(channel, "channel_name", None) or url.rstrip("/").split("/")[-1]
+                playlist_title = (
+                    getattr(channel, "channel_name", None)
+                    or url.rstrip("/").split("/")[-1]
+                )
                 if not args.target and not template:
                     args.target = safe_filename(playlist_title)
                 video_urls = list(channel.video_urls)
@@ -1392,8 +1545,12 @@ def main() -> None:
                 for idx, video in enumerate(channel.videos, start=1):
                     try:
                         _perform_args_on_youtube(
-                            video, args, archive=archive, template=template,
-                            playlist_index=idx, playlist_title=playlist_title,
+                            video,
+                            args,
+                            archive=archive,
+                            template=template,
+                            playlist_index=idx,
+                            playlist_title=playlist_title,
                         )
                     except exceptions.PytError as exc:
                         _print_err(f"{video.watch_url}  —  {exc}")
@@ -1417,8 +1574,12 @@ def main() -> None:
                 for idx, video in enumerate(playlist.videos, start=1):
                     try:
                         _perform_args_on_youtube(
-                            video, args, archive=archive, template=template,
-                            playlist_index=idx, playlist_title=playlist_title,
+                            video,
+                            args,
+                            archive=archive,
+                            template=template,
+                            playlist_index=idx,
+                            playlist_title=playlist_title,
                         )
                     except exceptions.PytError as exc:
                         _print_err(f"{video.watch_url}  —  {exc}")
@@ -1436,7 +1597,10 @@ def main() -> None:
                     warnings.simplefilter("ignore", DeprecationWarning)
                     youtube = YouTube(url, proxies=proxies, po_token=args.po_token)
                 _perform_args_on_youtube(
-                    youtube, args, archive=archive, template=template,
+                    youtube,
+                    args,
+                    archive=archive,
+                    template=template,
                 )
             except exceptions.VideoUnavailable as exc:
                 _print_err(str(exc))

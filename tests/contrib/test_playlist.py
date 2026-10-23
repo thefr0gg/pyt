@@ -7,25 +7,16 @@ from pyt.contrib.playlist import Playlist
 @mock.patch("pyt.request.get")
 def test_title(request_get, playlist_long_html):
     request_get.return_value = playlist_long_html
-    url = (
-        "https://www.fakeurl.com/playlist?list=PLS1QulWo1RIaJECMeUT4LFwJ"
-        "-ghgoSH6n"
-    )
+    url = "https://www.fakeurl.com/playlist?list=PLS1QulWo1RIaJECMeUT4LFwJ" "-ghgoSH6n"
     pl = Playlist(url)
     pl_title = pl.title
-    assert (
-        pl_title
-        == "Python Tutorial for Beginners (For Absolute Beginners)"
-    )
+    assert pl_title == "Python Tutorial for Beginners (For Absolute Beginners)"
 
 
 @mock.patch("pyt.request.get")
 def test_init_with_playlist_url(request_get):
     request_get.return_value = ""
-    url = (
-        "https://www.youtube.com/playlist?list=PLS1QulWo1RIaJECMeUT4LFwJ"
-        "-ghgoSH6n"
-    )
+    url = "https://www.youtube.com/playlist?list=PLS1QulWo1RIaJECMeUT4LFwJ" "-ghgoSH6n"
     playlist = Playlist(url)
     assert playlist.playlist_url == url
 
@@ -49,8 +40,7 @@ def test_last_updated(request_get, playlist_long_html):
     expected = datetime.date(2020, 10, 8)
     request_get.return_value = playlist_long_html
     playlist = Playlist(
-        "https://www.youtube.com/playlist?list"
-        "=PLS1QulWo1RIaJECMeUT4LFwJ-ghgoSH6n"
+        "https://www.youtube.com/playlist?list" "=PLS1QulWo1RIaJECMeUT4LFwJ-ghgoSH6n"
     )
     assert playlist.last_updated == expected
 
@@ -171,9 +161,7 @@ def test_playlist_failed_pagination(request_post, request_get, playlist_long_htm
     request_get.side_effect = [
         playlist_long_html,
     ]
-    request_post.side_effect = [
-        "{}"
-    ]
+    request_post.side_effect = ["{}"]
     playlist = Playlist(url)
     video_urls = playlist.video_urls
     assert len(video_urls) == 100
@@ -193,11 +181,11 @@ def test_playlist_failed_pagination(request_post, request_get, playlist_long_htm
 
 @mock.patch("pyt.request.get")
 @mock.patch("pyt.request.post")
-def test_playlist_pagination(request_post, request_get, playlist_html, playlist_long_html):
+def test_playlist_pagination(
+    request_post, request_get, playlist_html, playlist_long_html
+):
     url = "https://www.fakeurl.com/playlist?list=whatever"
-    request_get.side_effect = [
-        playlist_long_html
-    ]
+    request_get.side_effect = [playlist_long_html]
     request_post.side_effect = [
         '{"content_html":"<a '
         'href=\\"/watch?v=BcWz41-4cDk&amp;feature=plpp_video&amp;ved'
@@ -229,9 +217,7 @@ def test_trimmed_pagination(request_get, playlist_html, playlist_long_html):
 
 # TODO: Test case not clear to me
 @mock.patch("pyt.request.get")
-def test_trimmed_pagination_not_found(
-    request_get, playlist_html, playlist_long_html
-):
+def test_trimmed_pagination_not_found(request_get, playlist_html, playlist_long_html):
     url = "https://www.fakeurl.com/playlist?list=whatever"
     request_get.side_effect = [
         playlist_long_html,
@@ -241,7 +227,7 @@ def test_trimmed_pagination_not_found(
         '"load_more_widget_html":""}',
         "{}",
     ]
-    playlist = Playlist(url) # noqa
+    playlist = Playlist(url)  # noqa
     # assert len(list(playlist.trimmed("wont-be-found"))) == 101 # noqa
     assert True
 
@@ -264,7 +250,7 @@ def test_playlist_submenu(request_get, playlist_submenu_html):
 
 @mock.patch("pyt.request.get")
 def test_playlist_length(request_get, playlist_long_html):
-    url = 'https://www.example.com/playlist?list=whatever'
+    url = "https://www.example.com/playlist?list=whatever"
     request_get.return_value = playlist_long_html
     p = Playlist(url)
     assert p.length == 217
@@ -272,27 +258,27 @@ def test_playlist_length(request_get, playlist_long_html):
 
 @mock.patch("pyt.request.get")
 def test_playlist_description(request_get, playlist_long_html):
-    url = 'https://www.example.com/playlist?list=whatever'
+    url = "https://www.example.com/playlist?list=whatever"
     request_get.return_value = playlist_long_html
     p = Playlist(url)
     assert p.description == (
-        'Python Object Oriented - Learning Python in '
+        "Python Object Oriented - Learning Python in "
         "simple and easy steps ,python,xml,script,install, A beginner's "
-        'tutorial containing complete knowledge of Python Syntax Object '
-        'Oriented Language, Methods, Tuples,Learn,Python,Tutorial,Interactive,'
-        'Free, Tools/Utilities,Getting the most popular pages from your Apache'
-        ' logfile,Make your life easier with Virtualenvwrapper,This site now '
-        'runs on Django,PythonForBeginners.com has a new owner,How to use '
-        'Pillow, a fork of PIL,How to use the Python Imaging Library,Python '
-        'Websites and Tutorials,How to use Envoy,Using Feedparser in Python,'
-        'Subprocess and Shell Commands in Python, Exceptions Handling, '
-        'Sockets, GUI, Extentions, XML Programming'
+        "tutorial containing complete knowledge of Python Syntax Object "
+        "Oriented Language, Methods, Tuples,Learn,Python,Tutorial,Interactive,"
+        "Free, Tools/Utilities,Getting the most popular pages from your Apache"
+        " logfile,Make your life easier with Virtualenvwrapper,This site now "
+        "runs on Django,PythonForBeginners.com has a new owner,How to use "
+        "Pillow, a fork of PIL,How to use the Python Imaging Library,Python "
+        "Websites and Tutorials,How to use Envoy,Using Feedparser in Python,"
+        "Subprocess and Shell Commands in Python, Exceptions Handling, "
+        "Sockets, GUI, Extentions, XML Programming"
     )
 
 
 @mock.patch("pyt.request.get")
 def test_playlist_views(request_get, playlist_long_html):
-    url = 'https://www.example.com/playlist?list=whatever'
+    url = "https://www.example.com/playlist?list=whatever"
     request_get.return_value = playlist_long_html
     p = Playlist(url)
     assert p.views == 4617130
@@ -300,23 +286,23 @@ def test_playlist_views(request_get, playlist_long_html):
 
 @mock.patch("pyt.request.get")
 def test_playlist_owner(request_get, playlist_long_html):
-    url = 'https://www.example.com/playlist?list=whatever'
+    url = "https://www.example.com/playlist?list=whatever"
     request_get.return_value = playlist_long_html
     p = Playlist(url)
-    assert p.owner == 'ProgrammingKnowledge'
+    assert p.owner == "ProgrammingKnowledge"
 
 
 @mock.patch("pyt.request.get")
 def test_playlist_owner_id(request_get, playlist_long_html):
-    url = 'https://www.example.com/playlist?list=whatever'
+    url = "https://www.example.com/playlist?list=whatever"
     request_get.return_value = playlist_long_html
     p = Playlist(url)
-    assert p.owner_id == 'UCs6nmQViDpUw0nuIx9c_WvA'
+    assert p.owner_id == "UCs6nmQViDpUw0nuIx9c_WvA"
 
 
 @mock.patch("pyt.request.get")
 def test_playlist_owner_url(request_get, playlist_long_html):
-    url = 'https://www.example.com/playlist?list=whatever'
+    url = "https://www.example.com/playlist?list=whatever"
     request_get.return_value = playlist_long_html
     p = Playlist(url)
-    assert p.owner_url == 'https://www.youtube.com/channel/UCs6nmQViDpUw0nuIx9c_WvA'
+    assert p.owner_url == "https://www.youtube.com/channel/UCs6nmQViDpUw0nuIx9c_WvA"

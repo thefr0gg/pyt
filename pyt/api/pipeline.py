@@ -18,6 +18,7 @@ Example::
             | pp.extract_audio("mp3")
     ).run()
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -113,7 +114,9 @@ def sponsorblock(
         raise ValueError("sponsorblock(): one of mark= or remove= is required")
     if mark:
         return _SponsorBlock(name="sponsorblock", mode="mark", categories=list(mark))
-    return _SponsorBlock(name="sponsorblock", mode="remove", categories=list(remove or []))
+    return _SponsorBlock(
+        name="sponsorblock", mode="remove", categories=list(remove or [])
+    )
 
 
 def embed_metadata() -> PipelineStep:
@@ -131,7 +134,9 @@ def embed_subtitles(lang: str = "en") -> PipelineStep:
     return _EmbedSubtitles(name="embed_subtitles", lang=lang)
 
 
-def extract_audio(format: str = "mp3", *, quality: Optional[str] = None) -> PipelineStep:
+def extract_audio(
+    format: str = "mp3", *, quality: Optional[str] = None
+) -> PipelineStep:
     """Transcode the file to an audio-only container."""
     return _ExtractAudio(name="extract_audio", format=format, quality=quality)
 

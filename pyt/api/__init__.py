@@ -19,6 +19,7 @@ Async support is intentionally not in this v1. Adding it requires moving
 ``pyt.request`` to ``httpx`` and threading awaitables through the SABR
 session — that lands as a separate milestone.
 """
+
 # Bootstrap ~/.pyt/bin onto PATH before anything else does shutil.which().
 from pyt.api import _paths as _paths  # noqa: F401
 
@@ -50,6 +51,7 @@ from pyt.api.video import Video
 from pyt.api.streams import StreamSet, StreamRef
 from pyt.api.download import Download, ProgressEvent
 from pyt.api.combined import CombinedDownload
+from pyt.api.live_download import LiveDownload
 from pyt.api.playlists import Playlist, ChannelFeed, SearchResults
 from pyt.api import pipeline
 
@@ -60,6 +62,7 @@ __all__ = [
     "StreamRef",
     "Download",
     "CombinedDownload",
+    "LiveDownload",
     "ProgressEvent",
     "Playlist",
     "ChannelFeed",

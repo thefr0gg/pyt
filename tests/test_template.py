@@ -1,4 +1,5 @@
 """Tests for pyt.template.OutputTemplate."""
+
 import os
 from datetime import datetime
 from unittest import mock
@@ -7,11 +8,16 @@ import pytest
 
 from pyt.template import OutputTemplate, DEFAULT_TEMPLATE
 
-
 # ── helpers ──────────────────────────────────────────────────────────────────
 
-def _yt(title="My Video", author="Chan", video_id="abc123",
-        channel_id="UCxyz", publish_date=None):
+
+def _yt(
+    title="My Video",
+    author="Chan",
+    video_id="abc123",
+    channel_id="UCxyz",
+    publish_date=None,
+):
     yt = mock.MagicMock()
     yt.title = title
     yt.author = author
@@ -21,8 +27,9 @@ def _yt(title="My Video", author="Chan", video_id="abc123",
     return yt
 
 
-def _stream(subtype="mp4", resolution="1080p", fps=30, abr="128kbps",
-            filesize_approx=10_000_000):
+def _stream(
+    subtype="mp4", resolution="1080p", fps=30, abr="128kbps", filesize_approx=10_000_000
+):
     s = mock.MagicMock()
     s.subtype = subtype
     s.resolution = resolution
@@ -33,6 +40,7 @@ def _stream(subtype="mp4", resolution="1080p", fps=30, abr="128kbps",
 
 
 # ── default template ──────────────────────────────────────────────────────────
+
 
 def test_default_template_constant():
     assert DEFAULT_TEMPLATE == "{title}.{ext}"
@@ -46,15 +54,19 @@ def test_default_template_renders_title_and_ext():
 
 # ── individual field substitution ────────────────────────────────────────────
 
-@pytest.mark.parametrize("field,expected", [
-    ("{title}.{ext}",      "My Title.mp4"),
-    ("{author}.{ext}",     "Artist.mp4"),
-    ("{id}.{ext}",         "vid001.mp4"),
-    ("{channel_id}.{ext}", "UC123.mp4"),
-    ("{resolution}.{ext}", "720p.mp4"),
-    ("{fps}.{ext}",        "25.mp4"),
-    ("{abr}.{ext}",        "192kbps.mp4"),
-])
+
+@pytest.mark.parametrize(
+    "field,expected",
+    [
+        ("{title}.{ext}", "My Title.mp4"),
+        ("{author}.{ext}", "Artist.mp4"),
+        ("{id}.{ext}", "vid001.mp4"),
+        ("{channel_id}.{ext}", "UC123.mp4"),
+        ("{resolution}.{ext}", "720p.mp4"),
+        ("{fps}.{ext}", "25.mp4"),
+        ("{abr}.{ext}", "192kbps.mp4"),
+    ],
+)
 def test_single_field(field, expected):
     yt = _yt(title="My Title", author="Artist", video_id="vid001", channel_id="UC123")
     stream = _stream(subtype="mp4", resolution="720p", fps=25, abr="192kbps")
@@ -87,6 +99,7 @@ def test_filesize_field():
 
 # ── unknown fields left as-is ─────────────────────────────────────────────────
 
+
 def test_unknown_field_preserved():
     t = OutputTemplate("{nonexistent}.{ext}")
     result = t.render(_yt(), _stream())
@@ -95,11 +108,15 @@ def test_unknown_field_preserved():
 
 # ── unsafe character sanitization ────────────────────────────────────────────
 
-@pytest.mark.parametrize("bad_title,safe", [
-    ('Hello: World', 'Hello_ World'),
-    ('Test*File',    'Test_File'),
-    ('  leading',    'leading'),   # leading space stripped
-])
+
+@pytest.mark.parametrize(
+    "bad_title,safe",
+    [
+        ("Hello: World", "Hello_ World"),
+        ("Test*File", "Test_File"),
+        ("  leading", "leading"),  # leading space stripped
+    ],
+)
 def test_unsafe_chars_sanitized(bad_title, safe):
     t = OutputTemplate("{title}.{ext}")
     result = t.render(_yt(title=bad_title), _stream(subtype="mp4"))
@@ -131,6 +148,7 @@ def test_all_dots_title_strips_to_extension_only():
 
 # ── directory separators create sub-paths ────────────────────────────────────
 
+
 def test_directory_separator_creates_subpath():
     t = OutputTemplate("{author}/{title}.{ext}")
     result = t.render(_yt(title="Song", author="Artist"), _stream())
@@ -145,6 +163,7 @@ def test_nested_directories():
 
 # ── playlist fields ───────────────────────────────────────────────────────────
 
+
 def test_playlist_index_zero_padded():
     t = OutputTemplate("{playlist_index}. {title}.{ext}")
     result = t.render(_yt(title="EP"), _stream(), playlist_index=7)
@@ -158,6 +177,7 @@ def test_playlist_title_field():
 
 
 # ── missing youtube attributes don't crash ───────────────────────────────────
+
 
 def test_missing_youtube_attrs_skip_gracefully():
     yt = mock.MagicMock()

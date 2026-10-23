@@ -8,6 +8,7 @@ importable from ``pyt.legacy`` through this release cycle:
 
 They emit a ``DeprecationWarning`` and will be removed in v4.
 """
+
 __title__ = "pyt"
 __author__ = "ramsy0dev"
 __license__ = "MIT"
@@ -26,6 +27,7 @@ from pyt.api import (
     StreamRef,
     Download,
     CombinedDownload,
+    LiveDownload,
     ChannelFeed,
     SearchResults,
     pipeline,

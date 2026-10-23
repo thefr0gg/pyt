@@ -5,6 +5,7 @@ write a single ``except PytError`` block. Every error carries enough
 identifying context (``video_id``, ``url``, ``client_used``) to file a
 useful bug report without further plumbing.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -21,7 +22,9 @@ class PytError(Exception):
 class VideoUnavailable(PytError):
     """Video is private, removed, region-blocked, or otherwise inaccessible."""
 
-    def __init__(self, video_id: str, reason: str = "unavailable", url: Optional[str] = None):
+    def __init__(
+        self, video_id: str, reason: str = "unavailable", url: Optional[str] = None
+    ):
         self.video_id = video_id
         self.url = url
         self.reason = reason
@@ -93,10 +96,11 @@ class LiveStreamUpcoming(PytError):
         self.url = url
         self.scheduled_start = scheduled_start
         when = (
-            f" (scheduled for {scheduled_start.isoformat()})"
-            if scheduled_start else ""
+            f" (scheduled for {scheduled_start.isoformat()})" if scheduled_start else ""
         )
-        super().__init__(f"video {video_id} is a scheduled live stream that hasn't started yet{when}")
+        super().__init__(
+            f"video {video_id} is a scheduled live stream that hasn't started yet{when}"
+        )
 
 
 class NoMatchingStream(PytError):
@@ -142,9 +146,9 @@ class AttestationRequired(PytError):
         super().__init__(
             message
             or "YouTube requires a valid PO token for this video. "
-               "Pass po_token=<token>, po_token_provider=<callable>, or "
-               "po_token_cmd=<shell-cmd> to Client(...). "
-               "See docs/features/po-token.md for how to obtain a token."
+            "Pass po_token=<token>, po_token_provider=<callable>, or "
+            "po_token_cmd=<shell-cmd> to Client(...). "
+            "See docs/features/po-token.md for how to obtain a token."
         )
 
 

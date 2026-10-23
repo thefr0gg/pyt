@@ -1,4 +1,5 @@
 """Thumbnail embedding post-processor."""
+
 from __future__ import annotations
 
 import os
@@ -62,27 +63,42 @@ class EmbedThumbnailPostProcessor(FFmpegPostProcessor):
 
     def _embed_mp4(self, file_path: str, thumb: str, ext: str) -> str:
         tmp = self._temp_path(file_path, ext)
-        self._run_ffmpeg([
-            "-i", file_path,
-            "-i", thumb,
-            "-map", "0",
-            "-map", "1",
-            "-disposition:v:1", "attached_pic",
-            "-codec", "copy",
-            tmp,
-        ])
+        self._run_ffmpeg(
+            [
+                "-i",
+                file_path,
+                "-i",
+                thumb,
+                "-map",
+                "0",
+                "-map",
+                "1",
+                "-disposition:v:1",
+                "attached_pic",
+                "-codec",
+                "copy",
+                tmp,
+            ]
+        )
         return self._replace_file(tmp, file_path)
 
     def _embed_ogg(self, file_path: str, thumb: str, ext: str) -> str:
         tmp = self._temp_path(file_path, ext)
-        self._run_ffmpeg([
-            "-i", file_path,
-            "-i", thumb,
-            "-map", "0",
-            "-map", "1",
-            "-codec", "copy",
-            tmp,
-        ])
+        self._run_ffmpeg(
+            [
+                "-i",
+                file_path,
+                "-i",
+                thumb,
+                "-map",
+                "0",
+                "-map",
+                "1",
+                "-codec",
+                "copy",
+                tmp,
+            ]
+        )
         return self._replace_file(tmp, file_path)
 
     def _try_mutagen_mp3(self, file_path: str, thumb_path: str) -> bool:

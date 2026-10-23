@@ -17,6 +17,7 @@ remaining tail is finished via byte-range request — same fallback the
 single-format :meth:`Stream.download` path uses. A 99%-complete download
 should never die because of one bad SABR exchange.
 """
+
 from __future__ import annotations
 
 import logging
@@ -132,6 +133,7 @@ class CombinedDownload:
         """Drive one SABR session for both formats, merge with ffmpeg,
         run any pipeline steps, return the final :class:`Path`."""
         import time as _time
+
         t_start = _time.monotonic()
         target_dir = Path(target_directory(self._output_path))
         container = self._container or pick_merge_container_for_streams(
@@ -140,9 +142,13 @@ class CombinedDownload:
         logger.info(
             "CombinedDownload.run: video itag=%d (%s) + audio itag=%d (%s) "
             "container=%s output=%s steps=%d (video_id=%s)",
-            self._video_stream.itag, self._video_stream.video_codec,
-            self._audio_stream.itag, self._audio_stream.audio_codec,
-            container, target_dir, len(self._steps),
+            self._video_stream.itag,
+            self._video_stream.video_codec,
+            self._audio_stream.itag,
+            self._audio_stream.audio_codec,
+            container,
+            target_dir,
+            len(self._steps),
             self._video.video_id,
         )
 
@@ -154,6 +160,7 @@ class CombinedDownload:
                 final_filename = self._filename
         else:
             from pyt.helpers import safe_filename as _sf
+
             stem = _sf(self._video.title or self._video.video_id)
             final_filename = f"{stem}.{container}"
         final_path = target_dir / final_filename
@@ -170,9 +177,7 @@ class CombinedDownload:
                 # same on PO-token-driven retries.
                 if not self._try_refresh_po_token():
                     raise
-                logger.info(
-                    "CombinedDownload: retrying SABR with refreshed PO token"
-                )
+                logger.info("CombinedDownload: retrying SABR with refreshed PO token")
                 # Reset part files for a clean second attempt.
                 for p in parts:
                     p.fh.close()
@@ -254,13 +259,15 @@ class CombinedDownload:
             path = target_dir / f"{base_stem}.{role}.{stream.subtype}.part"
             fh = open(path, "wb")
             expected = stream.filesize or stream.filesize_approx or 0
-            out.append(_PartFile(
-                itag=stream.itag,
-                path=path,
-                fh=fh,
-                expected=int(expected) if expected else 0,
-                direct_url=stream.url,
-            ))
+            out.append(
+                _PartFile(
+                    itag=stream.itag,
+                    path=path,
+                    fh=fh,
+                    expected=int(expected) if expected else 0,
+                    direct_url=stream.url,
+                )
+            )
         return out
 
     def _drive_sabr_session(self, parts: List[_PartFile]) -> None:
@@ -278,7 +285,9 @@ class CombinedDownload:
 
         logger.debug(
             "CombinedDownload: opening SABR session url=%s formats=[(%d,video),(%d,audio)]",
-            sabr_url, self._video_stream.itag, self._audio_stream.itag,
+            sabr_url,
+            self._video_stream.itag,
+            self._audio_stream.itag,
         )
 
         session = SabrSession(
@@ -292,7 +301,11 @@ class CombinedDownload:
             client_info=sabr_cfg.client_info if sabr_cfg else {},
             duration_ms=int((sabr_cfg.duration or 0) * 1000) if sabr_cfg else 0,
             expected_sizes={p.itag: p.expected for p in parts if p.expected},
-            timeout=self._timeout if self._timeout is not None else socket._GLOBAL_DEFAULT_TIMEOUT,
+            timeout=(
+                self._timeout
+                if self._timeout is not None
+                else socket._GLOBAL_DEFAULT_TIMEOUT
+            ),
             refresh_callback=sabr_cfg.refresh_sabr_config if sabr_cfg else None,
         )
 
@@ -314,7 +327,8 @@ class CombinedDownload:
             logger.info(
                 "CombinedDownload: ATTESTATION_REQUIRED on itag=%d/%d "
                 "for video_id=%s",
-                self._video_stream.itag, self._audio_stream.itag,
+                self._video_stream.itag,
+                self._audio_stream.itag,
                 self._video.video_id,
             )
             raise AttestationRequired(
@@ -325,7 +339,9 @@ class CombinedDownload:
         except SabrError as exc:
             # Other SABR failures — let the range-fallback path
             # finish whatever's missing.
-            logger.warning("SABR session ended with error (%s); falling back to range", exc)
+            logger.warning(
+                "SABR session ended with error (%s); falling back to range", exc
+            )
 
     def _finish_with_range_fallback(self, parts: List[_PartFile]) -> None:
         for p in parts:
@@ -333,7 +349,8 @@ class CombinedDownload:
             if remaining <= 0:
                 logger.debug(
                     "CombinedDownload: itag=%d delivered fully via SABR (%d bytes)",
-                    p.itag, p.written,
+                    p.itag,
+                    p.written,
                 )
                 continue
             if not p.direct_url:
@@ -345,7 +362,9 @@ class CombinedDownload:
                 )
             logger.info(
                 "itag %d: SABR left %d/%d bytes; finishing with byte-range",
-                p.itag, remaining, p.expected,
+                p.itag,
+                remaining,
+                p.expected,
             )
             try:
                 self._range_finish(p)
@@ -394,7 +413,8 @@ class CombinedDownload:
             sabr_cfg.po_token = new_token
         logger.info(
             "CombinedDownload: refreshed po_token (%d chars) for video_id=%s",
-            len(new_token), self._video.video_id,
+            len(new_token),
+            self._video.video_id,
         )
         return True
 
@@ -424,6 +444,7 @@ def _decode_po_token(value):
     if value is None or isinstance(value, (bytes, bytearray)):
         return value
     import base64
+
     s = str(value)
     try:
         padded = s + "=" * (-len(s) % 4)

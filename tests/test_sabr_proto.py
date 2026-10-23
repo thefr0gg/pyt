@@ -3,6 +3,7 @@
 These are tiny but load-bearing: every SABR message we send and every
 UMP part we parse goes through them. A regression here would cascade
 into completely silent wire-format corruption."""
+
 from __future__ import annotations
 
 import struct
@@ -11,15 +12,33 @@ import pytest
 
 from pyt.sabr import proto
 
-
 # ── varint round-trips ────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("value", [
-    0, 1, 7, 127, 128, 255, 300, 16_383, 16_384, 65_535, 65_536,
-    1_000_000, 2_097_151, 2_097_152, 268_435_455, 268_435_456,
-    (1 << 31) - 1, (1 << 32) - 1, (1 << 53) - 1,
-])
+@pytest.mark.parametrize(
+    "value",
+    [
+        0,
+        1,
+        7,
+        127,
+        128,
+        255,
+        300,
+        16_383,
+        16_384,
+        65_535,
+        65_536,
+        1_000_000,
+        2_097_151,
+        2_097_152,
+        268_435_455,
+        268_435_456,
+        (1 << 31) - 1,
+        (1 << 32) - 1,
+        (1 << 53) - 1,
+    ],
+)
 def test_varint_round_trip(value):
     encoded = proto.encode_varint(value)
     decoded, pos = proto.decode_varint(encoded, 0)
@@ -68,7 +87,7 @@ def test_field_string_encodes_utf8():
     encoded = proto.field_string(1, "héllo")
     body = encoded[1:]
     length, pos = proto.decode_varint(body, 0)
-    assert body[pos:pos + length] == "héllo".encode("utf-8")
+    assert body[pos : pos + length] == "héllo".encode("utf-8")
 
 
 def test_field_message_is_field_bytes_alias():

@@ -1,4 +1,5 @@
 """Base class for pyt post-processors."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

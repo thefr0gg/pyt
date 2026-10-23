@@ -1,4 +1,5 @@
 """Internal: hydrate typed stream objects from a raw player response."""
+
 from __future__ import annotations
 
 import base64
@@ -18,6 +19,7 @@ class _RawStream:
 
     Produced by :func:`hydrate_streams`; consumed by :class:`StreamRef`.
     """
+
     itag: int
     url: str
     mime_type: str
@@ -40,41 +42,42 @@ class _RawStream:
 def _decode_ustreamer_config(player_response: dict) -> Optional[bytes]:
     try:
         raw = (
-            player_response
-            .get('playerConfig', {})
-            .get('mediaCommonConfig', {})
-            .get('mediaUstreamerRequestConfig', {})
-            .get('videoPlaybackUstreamerConfig')
+            player_response.get("playerConfig", {})
+            .get("mediaCommonConfig", {})
+            .get("mediaUstreamerRequestConfig", {})
+            .get("videoPlaybackUstreamerConfig")
         )
         if not raw:
             return None
-        padded = raw + '=' * (-len(raw) % 4)
+        padded = raw + "=" * (-len(raw) % 4)
         return base64.urlsafe_b64decode(padded)
     except Exception:
         return None
 
 
-def _parse_one(stream_dict: dict, duration: Optional[float], title: str) -> Optional[_RawStream]:
-    url = stream_dict.get('url')
+def _parse_one(
+    stream_dict: dict, duration: Optional[float], title: str
+) -> Optional[_RawStream]:
+    url = stream_dict.get("url")
     if not url:
         return None
 
-    itag = int(stream_dict.get('itag', 0))
-    mime_raw = stream_dict.get('mimeType', '')
+    itag = int(stream_dict.get("itag", 0))
+    mime_raw = stream_dict.get("mimeType", "")
 
     try:
         mime_type, codecs = extract.mime_type_codec(mime_raw)
     except Exception:
         return None
 
-    kind, subtype = mime_type.split('/', 1) if '/' in mime_type else (mime_type, '')
+    kind, subtype = mime_type.split("/", 1) if "/" in mime_type else (mime_type, "")
     is_adaptive = bool(len(codecs) % 2)
     is_progressive = not is_adaptive
 
     if not is_adaptive:
         video_codec = codecs[0] if len(codecs) > 0 else None
         audio_codec = codecs[1] if len(codecs) > 1 else None
-    elif kind == 'video':
+    elif kind == "video":
         video_codec = codecs[0] if codecs else None
         audio_codec = None
     else:
@@ -82,17 +85,17 @@ def _parse_one(stream_dict: dict, duration: Optional[float], title: str) -> Opti
         audio_codec = codecs[0] if codecs else None
 
     itag_profile = get_format_profile(itag)
-    resolution: Optional[str] = itag_profile.get('resolution')
-    abr: Optional[str] = itag_profile.get('abr')
+    resolution: Optional[str] = itag_profile.get("resolution")
+    abr: Optional[str] = itag_profile.get("abr")
 
-    fps_raw = stream_dict.get('fps')
+    fps_raw = stream_dict.get("fps")
     fps = int(fps_raw) if fps_raw else None
 
-    bitrate_raw = stream_dict.get('bitrate')
+    bitrate_raw = stream_dict.get("bitrate")
     bitrate = int(bitrate_raw) if bitrate_raw else None
 
     try:
-        filesize = int(stream_dict.get('contentLength', 0) or 0)
+        filesize = int(stream_dict.get("contentLength", 0) or 0)
     except (TypeError, ValueError):
         filesize = 0
 
@@ -102,6 +105,7 @@ def _parse_one(stream_dict: dict, duration: Optional[float], title: str) -> Opti
         filesize_approx = filesize
 
     from pyt.helpers import safe_filename as _safe
+
     default_filename = f"{_safe(title or 'video')}.{subtype}"
 
     return _RawStream(
@@ -114,7 +118,7 @@ def _parse_one(stream_dict: dict, duration: Optional[float], title: str) -> Opti
         audio_codec=audio_codec,
         is_adaptive=is_adaptive,
         is_progressive=is_progressive,
-        is_otf=bool(stream_dict.get('is_otf', False)),
+        is_otf=bool(stream_dict.get("is_otf", False)),
         bitrate=bitrate,
         filesize=filesize,
         filesize_approx=filesize_approx,
@@ -136,7 +140,7 @@ def hydrate_streams(
     on_complete: Optional[Callable] = None,
     duration: Optional[float] = None,
     video_id: Optional[str] = None,
-    title: str = '',
+    title: str = "",
 ) -> Tuple[List[_RawStream], "_SabrConfig"]:
     """Parse streaming data from *player_response* into typed stream objects.
 
@@ -146,11 +150,11 @@ def hydrate_streams(
     from pyt.api._player import build_client_info
     from pyt.innertube import _default_clients
 
-    streaming_data = player_response.get('streamingData') or {}
+    streaming_data = player_response.get("streamingData") or {}
     stream_manifest = extract.apply_descrambler(streaming_data) or []
 
     # Fetch the player JS and apply cipher only if any stream needs it.
-    needs_cipher = any('s' in s for s in stream_manifest)
+    needs_cipher = any("s" in s for s in stream_manifest)
     if needs_cipher and video_id:
         try:
             watch_url = f"https://youtube.com/watch?v={video_id}"
@@ -160,15 +164,17 @@ def hydrate_streams(
             extract.apply_signature(stream_manifest, player_response, js)
         except Exception as exc:
             logger.warning(
-                "apply_signature failed for %s: %s; some URLs may not work", video_id, exc
+                "apply_signature failed for %s: %s; some URLs may not work",
+                video_id,
+                exc,
             )
 
-    sabr_url = streaming_data.get('serverAbrStreamingUrl')
+    sabr_url = streaming_data.get("serverAbrStreamingUrl")
     ustreamer_config = _decode_ustreamer_config(player_response)
 
     cfg = client_cfg or _default_clients.get(client_name, {})
     client_info = build_client_info(client_name, cfg, visitor_data)
-    stream_headers = dict(cfg.get('header') or {})
+    stream_headers = dict(cfg.get("header") or {})
 
     sabr_config = _SabrConfig(
         sabr_url=sabr_url,
@@ -184,20 +190,27 @@ def hydrate_streams(
     # Wire up a refresh callback that re-fetches the player response and
     # updates sabr_url / ustreamer_config in-place on the _SabrConfig.
     if video_id:
+
         def _refresh() -> Tuple[Optional[str], Optional[bytes]]:
             from pyt.api._player import fetch_player_response
+
             try:
                 fresh, _, _, _ = fetch_player_response(
                     video_id,
                     url=f"https://youtube.com/watch?v={video_id}",
                 )
-                new_sd = fresh.get('streamingData') or {}
-                sabr_config.sabr_url = new_sd.get('serverAbrStreamingUrl')
+                new_sd = fresh.get("streamingData") or {}
+                sabr_config.sabr_url = new_sd.get("serverAbrStreamingUrl")
                 sabr_config.ustreamer_config = _decode_ustreamer_config(fresh)
                 return sabr_config.sabr_url, sabr_config.ustreamer_config
             except Exception as exc:
+                # Returning the stale url/config here would look like a
+                # successful refresh to SabrSession (it only checks
+                # `if not new_url`), sending it right back into another
+                # round against the same dead URL. Report failure instead
+                # so the caller raises SabrError and the fallback path runs.
                 logger.warning("SABR refresh failed: %s", exc)
-                return sabr_config.sabr_url, sabr_config.ustreamer_config
+                return None, None
 
         sabr_config.refresh_sabr_config = _refresh
 

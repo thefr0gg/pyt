@@ -25,6 +25,7 @@ Two algorithms, picked by ``algorithm=`` on :func:`pyt.api.pipeline.upscale`:
 The whole feature is experimental and emits a one-shot
 :class:`FutureWarning` on first use. API and defaults may change.
 """
+
 from __future__ import annotations
 
 import json
@@ -84,16 +85,16 @@ class _Upscale(PipelineStep):
     scale: int = 2
 
     # ── lanczos kwargs ─────────────────────────────────────────────────────
-    crf: int = 18                 # x264 CRF for the re-encode
-    preset: str = "medium"        # x264 speed/efficiency preset
-    sharpen: float = 0.4          # unsharp amount; 0 disables the sharpen pass
+    crf: int = 18  # x264 CRF for the re-encode
+    preset: str = "medium"  # x264 speed/efficiency preset
+    sharpen: float = 0.4  # unsharp amount; 0 disables the sharpen pass
 
     # ── realesrgan kwargs ──────────────────────────────────────────────────
     model: str = "realesrgan-x4plus"
     binary: Optional[str] = None
-    tile_size: int = 0            # 0 = auto. Lower if GPU OOMs.
+    tile_size: int = 0  # 0 = auto. Lower if GPU OOMs.
     keep_intermediate: bool = False
-    chunk_seconds: int = 30       # 0 disables chunking (process whole video in one shot)
+    chunk_seconds: int = 30  # 0 disables chunking (process whole video in one shot)
     threads: Optional[str] = None  # ncnn -j load:proc:save; None = binary default
 
     def apply(self, path: str, *, stream: "StreamRef", video: "Video") -> str:
@@ -158,7 +159,9 @@ def _atomic_swap(input_path: Path, new_file: Path) -> None:
     backup.unlink(missing_ok=True)
 
 
-def _translate_subprocess_failure(exc: subprocess.CalledProcessError, partial: Path) -> None:
+def _translate_subprocess_failure(
+    exc: subprocess.CalledProcessError, partial: Path
+) -> None:
     stderr = (exc.stderr or b"").decode("utf-8", errors="replace")
     raise PostProcessError(
         f"upscale: external command failed ({exc.cmd[0]}): "
@@ -202,15 +205,24 @@ def _run_lanczos(
     output_tmp = workdir / f"out{input_path.suffix}"
     try:
         cmd = [
-            ffmpeg, "-y",
-            "-loglevel", "error",
-            "-i", str(input_path),
-            "-vf", vf,
-            "-c:v", "libx264",
-            "-preset", preset,
-            "-crf", str(crf),
-            "-pix_fmt", "yuv420p",
-            "-c:a", "copy",
+            ffmpeg,
+            "-y",
+            "-loglevel",
+            "error",
+            "-i",
+            str(input_path),
+            "-vf",
+            vf,
+            "-c:v",
+            "libx264",
+            "-preset",
+            preset,
+            "-crf",
+            str(crf),
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "copy",
             str(output_tmp),
         ]
         logger.debug("upscale[lanczos]: %s", " ".join(cmd))
@@ -264,7 +276,8 @@ def _run_realesrgan(
         # can extend. Just warn so the typo'd-model case is loud.
         logger.warning(
             "upscale[realesrgan]: model %r not in known set %s; passing through verbatim",
-            model, sorted(_REALESRGAN_KNOWN_MODELS),
+            model,
+            sorted(_REALESRGAN_KNOWN_MODELS),
         )
 
     fps = _probe_fps(input_path) or 30.0
@@ -343,8 +356,13 @@ def _realesrgan_single_shot(
 
     _extract_frames(ffmpeg, input_path, frames_dir)
     _upscale_frames_realesrgan(
-        binary, frames_dir, upscaled_dir,
-        model=model, scale=scale, tile_size=tile_size, threads=threads,
+        binary,
+        frames_dir,
+        upscaled_dir,
+        model=model,
+        scale=scale,
+        tile_size=tile_size,
+        threads=threads,
     )
     _recombine(
         ffmpeg,
@@ -388,10 +406,17 @@ def _realesrgan_chunked(
         # fake chunk (the extra concat invocation is wasted work on a tiny clip).
         logger.info("upscale: could not probe duration; falling back to single-shot")
         return _realesrgan_single_shot(
-            ffmpeg=ffmpeg, binary=binary, workdir=workdir,
-            input_path=input_path, output_tmp=output_tmp,
-            scale=scale, model=model, tile_size=tile_size,
-            threads=threads, has_audio=has_audio, fps=fps,
+            ffmpeg=ffmpeg,
+            binary=binary,
+            workdir=workdir,
+            input_path=input_path,
+            output_tmp=output_tmp,
+            scale=scale,
+            model=model,
+            tile_size=tile_size,
+            threads=threads,
+            has_audio=has_audio,
+            fps=fps,
         )
 
     chunk_dir = workdir / "chunks"
@@ -401,7 +426,9 @@ def _realesrgan_chunked(
     chunk_videos: List[Path] = []
     logger.info(
         "upscale[realesrgan]: %d chunks of ~%ds (duration=%.1fs)",
-        n_chunks, chunk_seconds, duration,
+        n_chunks,
+        chunk_seconds,
+        duration,
     )
 
     # Reusable scratch directories so we never hold more than one chunk's
@@ -421,12 +448,20 @@ def _realesrgan_chunked(
             d.mkdir()
 
         _extract_frames_segment(
-            ffmpeg, input_path, frames_dir,
-            start=start, duration=chunk_dur,
+            ffmpeg,
+            input_path,
+            frames_dir,
+            start=start,
+            duration=chunk_dur,
         )
         _upscale_frames_realesrgan(
-            binary, frames_dir, upscaled_dir,
-            model=model, scale=scale, tile_size=tile_size, threads=threads,
+            binary,
+            frames_dir,
+            upscaled_dir,
+            model=model,
+            scale=scale,
+            tile_size=tile_size,
+            threads=threads,
         )
         chunk_video = chunk_dir / f"chunk_{i:04d}.mp4"
         _encode_chunk_video(ffmpeg, upscaled_dir, chunk_video, fps=fps)
@@ -446,7 +481,9 @@ def _realesrgan_chunked(
     if has_audio:
         concat_video = workdir / f"concat{input_path.suffix}"
         _concat_videos(ffmpeg, chunk_videos, concat_video)
-        _mux_audio(ffmpeg, video=concat_video, audio_source=input_path, output=output_tmp)
+        _mux_audio(
+            ffmpeg, video=concat_video, audio_source=input_path, output=output_tmp
+        )
     else:
         _concat_videos(ffmpeg, chunk_videos, output_tmp)
 
@@ -456,9 +493,12 @@ def _realesrgan_chunked(
 
 def _extract_frames(ffmpeg: str, source: Path, target_dir: Path) -> None:
     cmd = [
-        ffmpeg, "-y",
-        "-loglevel", "error",
-        "-i", str(source),
+        ffmpeg,
+        "-y",
+        "-loglevel",
+        "error",
+        "-i",
+        str(source),
         # PNG to avoid recompression artifacts going into the upscaler.
         str(target_dir / "frame_%08d.png"),
     ]
@@ -483,16 +523,24 @@ def _extract_frames_segment(
     ffmpeg's `-t` is honored against the actual decode start.
     """
     cmd = [
-        ffmpeg, "-y",
-        "-loglevel", "error",
-        "-ss", f"{start:.3f}",
-        "-i", str(source),
-        "-t", f"{duration:.3f}",
+        ffmpeg,
+        "-y",
+        "-loglevel",
+        "error",
+        "-ss",
+        f"{start:.3f}",
+        "-i",
+        str(source),
+        "-t",
+        f"{duration:.3f}",
         "-an",  # video-only — audio is muxed back at the end
         str(target_dir / "frame_%08d.png"),
     ]
     logger.debug(
-        "upscale: extracting [%.2fs +%.2fs] -> %s", start, duration, target_dir,
+        "upscale: extracting [%.2fs +%.2fs] -> %s",
+        start,
+        duration,
+        target_dir,
     )
     subprocess.run(cmd, capture_output=True, check=True)  # nosec
 
@@ -509,11 +557,16 @@ def _upscale_frames_realesrgan(
 ) -> None:
     cmd: List[str] = [
         binary,
-        "-i", str(source_dir),
-        "-o", str(target_dir),
-        "-n", model,
-        "-s", str(scale),
-        "-f", "png",
+        "-i",
+        str(source_dir),
+        "-o",
+        str(target_dir),
+        "-n",
+        model,
+        "-s",
+        str(scale),
+        "-f",
+        "png",
     ]
     # The binary's default model path is "models/" relative to CWD, which
     # breaks when pyt is invoked from an arbitrary directory. Pass -m
@@ -543,13 +596,20 @@ def _encode_chunk_video(
     every chunk lets us concat them later with ``-c copy`` (no re-encode).
     """
     cmd = [
-        ffmpeg, "-y",
-        "-loglevel", "error",
-        "-framerate", f"{fps:.6f}",
-        "-i", str(frames_dir / "frame_%08d.png"),
-        "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
-        "-crf", "18",
+        ffmpeg,
+        "-y",
+        "-loglevel",
+        "error",
+        "-framerate",
+        f"{fps:.6f}",
+        "-i",
+        str(frames_dir / "frame_%08d.png"),
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-crf",
+        "18",
         "-an",
         str(output),
     ]
@@ -567,12 +627,18 @@ def _concat_videos(ffmpeg: str, chunks: List[Path], output: Path) -> None:
         encoding="utf-8",
     )
     cmd = [
-        ffmpeg, "-y",
-        "-loglevel", "error",
-        "-f", "concat",
-        "-safe", "0",
-        "-i", str(list_file),
-        "-c", "copy",
+        ffmpeg,
+        "-y",
+        "-loglevel",
+        "error",
+        "-f",
+        "concat",
+        "-safe",
+        "0",
+        "-i",
+        str(list_file),
+        "-c",
+        "copy",
         str(output),
     ]
     logger.debug("upscale: concat %d chunks -> %s", len(chunks), output)
@@ -588,13 +654,20 @@ def _mux_audio(
 ) -> None:
     """Combine an upscaled video-only file with the original audio track."""
     cmd = [
-        ffmpeg, "-y",
-        "-loglevel", "error",
-        "-i", str(video),
-        "-i", str(audio_source),
-        "-map", "0:v:0",
-        "-map", "1:a:0",
-        "-c", "copy",
+        ffmpeg,
+        "-y",
+        "-loglevel",
+        "error",
+        "-i",
+        str(video),
+        "-i",
+        str(audio_source),
+        "-map",
+        "0:v:0",
+        "-map",
+        "1:a:0",
+        "-c",
+        "copy",
         # If durations don't match exactly (chunk-boundary rounding), trim
         # to the shorter of the two so the mux doesn't fail on EOF mismatch.
         "-shortest",
@@ -615,13 +688,26 @@ def _recombine(
     """Single-shot path: encode all upscaled frames straight to the final
     container and (optionally) mux the source's audio in one pass."""
     cmd: List[str] = [
-        ffmpeg, "-y",
-        "-loglevel", "error",
-        "-framerate", f"{fps:.6f}",
-        "-i", str(frames_dir / "frame_%08d.png"),
+        ffmpeg,
+        "-y",
+        "-loglevel",
+        "error",
+        "-framerate",
+        f"{fps:.6f}",
+        "-i",
+        str(frames_dir / "frame_%08d.png"),
     ]
     if audio_source is not None:
-        cmd += ["-i", str(audio_source), "-map", "0:v:0", "-map", "1:a:0", "-c:a", "copy"]
+        cmd += [
+            "-i",
+            str(audio_source),
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c:a",
+            "copy",
+        ]
     cmd += ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", str(output)]
     logger.debug("upscale: recombining -> %s", output)
     subprocess.run(cmd, capture_output=True, check=True)  # nosec
@@ -641,10 +727,14 @@ def _probe_fps(path: Path) -> Optional[float]:
         result = subprocess.run(  # nosec
             [
                 ffprobe,
-                "-v", "error",
-                "-select_streams", "v:0",
-                "-show_entries", "stream=avg_frame_rate",
-                "-of", "json",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=avg_frame_rate",
+                "-of",
+                "json",
                 str(path),
             ],
             capture_output=True,
@@ -674,9 +764,12 @@ def _probe_duration(path: Path) -> Optional[float]:
         result = subprocess.run(  # nosec
             [
                 ffprobe,
-                "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "csv=p=0",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "csv=p=0",
                 str(path),
             ],
             capture_output=True,
@@ -698,10 +791,14 @@ def _probe_has_audio(path: Path) -> bool:
         result = subprocess.run(  # nosec
             [
                 ffprobe,
-                "-v", "error",
-                "-select_streams", "a",
-                "-show_entries", "stream=codec_type",
-                "-of", "csv=p=0",
+                "-v",
+                "error",
+                "-select_streams",
+                "a",
+                "-show_entries",
+                "stream=codec_type",
+                "-of",
+                "csv=p=0",
                 str(path),
             ],
             capture_output=True,

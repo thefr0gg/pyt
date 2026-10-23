@@ -1,4 +1,5 @@
 """Output filename template engine."""
+
 from __future__ import annotations
 
 import os
@@ -96,7 +97,9 @@ class OutputTemplate:
         _try("id", lambda: youtube.video_id)
         _try("author", lambda: youtube.author)
         _try("channel_id", lambda: youtube.channel_id)
-        _try("upload_date", lambda: youtube.publish_date)  # datetime object; formatted in _replace
+        _try(
+            "upload_date", lambda: youtube.publish_date
+        )  # datetime object; formatted in _replace
         _try("ext", lambda: stream.subtype)
         _try("resolution", lambda: stream.resolution)
         _try("fps", lambda: getattr(stream, "fps", None))

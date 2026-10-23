@@ -17,6 +17,7 @@ Usage::
     from pyt import Client
     video = Client().video(url)
 """
+
 import warnings as _warnings
 
 
@@ -33,33 +34,41 @@ def __getattr__(name: str):
     if name == "YouTube":
         _warn(name)
         from pyt.__main__ import YouTube
+
         return YouTube
     if name == "Stream":
         _warn(name)
         from pyt.streams import Stream
+
         return Stream
     if name == "Caption":
         _warn(name)
         from pyt.captions import Caption
+
         return Caption
     if name in ("StreamQuery", "CaptionQuery"):
         _warn(name)
         from pyt.query import StreamQuery, CaptionQuery
+
         return StreamQuery if name == "StreamQuery" else CaptionQuery
     if name == "Monostate":
         _warn(name)
         from pyt.monostate import Monostate
+
         return Monostate
     if name == "Playlist":
         _warn(name)
         from pyt.contrib.playlist import Playlist
+
         return Playlist
     if name == "Channel":
         _warn(name)
         from pyt.contrib.channel import Channel
+
         return Channel
     if name == "Search":
         _warn(name)
         from pyt.contrib.search import Search
+
         return Search
     raise AttributeError(f"module 'pyt.legacy' has no attribute {name!r}")

@@ -1,4 +1,5 @@
 """Audio extraction post-processor."""
+
 from __future__ import annotations
 
 import os
@@ -15,14 +16,14 @@ if TYPE_CHECKING:
 
 # Maps user-facing format name → (ffmpeg codec, file extension)
 _CODEC_MAP = {
-    "mp3":    ("libmp3lame", ".mp3"),
-    "m4a":    ("aac",        ".m4a"),
-    "aac":    ("aac",        ".aac"),
-    "flac":   ("flac",       ".flac"),
-    "opus":   ("libopus",    ".opus"),
-    "vorbis": ("libvorbis",  ".ogg"),
-    "wav":    ("pcm_s16le",  ".wav"),
-    "alac":   ("alac",       ".m4a"),
+    "mp3": ("libmp3lame", ".mp3"),
+    "m4a": ("aac", ".m4a"),
+    "aac": ("aac", ".aac"),
+    "flac": ("flac", ".flac"),
+    "opus": ("libopus", ".opus"),
+    "vorbis": ("libvorbis", ".ogg"),
+    "wav": ("pcm_s16le", ".wav"),
+    "alac": ("alac", ".m4a"),
 }
 
 SUPPORTED_FORMATS = list(_CODEC_MAP)

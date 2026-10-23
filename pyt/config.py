@@ -1,4 +1,5 @@
 """Configuration file support for pyt."""
+
 from __future__ import annotations
 
 import configparser
@@ -12,18 +13,36 @@ _LOCATIONS = [
 
 # CLI flag names that are boolean toggles
 _BOOL_FLAGS = {
-    "verbose", "list", "list_captions", "build_playback_report",
-    "extract_audio", "embed_metadata", "embed_thumbnail", "embed_subs",
+    "verbose",
+    "list",
+    "list_captions",
+    "build_playback_report",
+    "extract_audio",
+    "embed_metadata",
+    "embed_thumbnail",
+    "embed_subs",
     "geo_bypass",
 }
 
 # CLI flag names that are string values
 _STR_FLAGS = {
-    "target", "output", "audio_format", "proxy", "cookies",
-    "cookies_from_browser", "download_archive", "batch_file",
-    "caption_code", "resolution", "audio", "ffmpeg",
-    "sponsorblock_mark", "sponsorblock_remove",
-    "sleep_interval", "max_sleep_interval", "geo_bypass_country",
+    "target",
+    "output",
+    "audio_format",
+    "proxy",
+    "cookies",
+    "cookies_from_browser",
+    "download_archive",
+    "batch_file",
+    "caption_code",
+    "resolution",
+    "audio",
+    "ffmpeg",
+    "sponsorblock_mark",
+    "sponsorblock_remove",
+    "sleep_interval",
+    "max_sleep_interval",
+    "geo_bypass_country",
     "itag",
 }
 

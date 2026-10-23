@@ -8,12 +8,22 @@ on:
 
 jobs:
   test:
-    name: Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    name: Python ${{ matrix.python-version }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          # doctor.py's install paths (zip extraction, .cmd vs shell
+          # wrapper, ~/.pyt layout) differ by real OS behavior that
+          # tests/test_doctor.py's platform mocks can't fully catch —
+          # run the one most-recent Python version on each OS too.
+          - os: windows-latest
+            python-version: "3.13"
+          - os: macos-latest
+            python-version: "3.13"
 
     steps:
       - uses: actions/checkout@v4
@@ -52,3 +62,24 @@ jobs:
 
       - name: Run mypy
         run: poetry run mypy pyt/ --ignore-missing-imports
+
+  lint:
+    name: Lint (black --check)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --with dev
+
+      - name: Run black --check
+        run: poetry run black --check pyt/ tests/

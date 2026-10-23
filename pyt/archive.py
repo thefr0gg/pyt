@@ -1,4 +1,5 @@
 """Download archive — track already-downloaded video IDs."""
+
 from __future__ import annotations
 
 import os
@@ -33,7 +34,7 @@ class DownloadArchive:
             for line in f:
                 line = line.strip()
                 if line.startswith("youtube "):
-                    self._ids.add(line[len("youtube "):].strip())
+                    self._ids.add(line[len("youtube ") :].strip())
 
     def is_downloaded(self, video_id: str) -> bool:
         """Return True if *video_id* is in the archive."""

@@ -4,6 +4,7 @@ Kept private (leading underscore) for now — the API may move once the new
 ``CombinedDownload`` shape settles. The CLI imports the same helper so
 container-selection logic doesn't drift between code paths.
 """
+
 from __future__ import annotations
 
 import logging
@@ -34,9 +35,12 @@ def probe_duration(path: Path) -> Optional[float]:
         result = subprocess.run(  # nosec
             [
                 ffprobe,
-                "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "csv=p=0",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "csv=p=0",
                 str(path),
             ],
             capture_output=True,
@@ -95,7 +99,9 @@ class FFmpegMergeError(RuntimeError):
     def __init__(self, returncode: int, stderr: str):
         self.returncode = returncode
         self.stderr = stderr
-        super().__init__(f"ffmpeg merge failed (exit {returncode}): {stderr.strip()[:400]}")
+        super().__init__(
+            f"ffmpeg merge failed (exit {returncode}): {stderr.strip()[:400]}"
+        )
 
 
 def run_ffmpeg_merge(
@@ -127,20 +133,31 @@ def run_ffmpeg_merge(
 
     ext = (container or output_path.suffix.lstrip(".")).lower()
     cmd = [
-        ffmpeg_bin, "-y",
-        "-loglevel", "warning", "-nostats",
+        ffmpeg_bin,
+        "-y",
+        "-loglevel",
+        "warning",
+        "-nostats",
         # Drop corrupt packets and keep muxing rather than halting on the
         # first bitstream issue. With -c copy the muxer doesn't decode, but
         # mp4 needs to validate AV1 OBU structure for track config — when
         # that validation trips, the default behavior is to stop early.
-        "-fflags", "+discardcorrupt",
-        "-err_detect", "ignore_err",
-        "-i", str(video_path),
-        "-i", str(audio_path),
-        "-map", "0:v:0",
-        "-map", "1:a:0",
-        "-c:v", "copy",
-        "-c:a", "copy",
+        "-fflags",
+        "+discardcorrupt",
+        "-err_detect",
+        "ignore_err",
+        "-i",
+        str(video_path),
+        "-i",
+        str(audio_path),
+        "-map",
+        "0:v:0",
+        "-map",
+        "1:a:0",
+        "-c:v",
+        "copy",
+        "-c:a",
+        "copy",
     ]
     if ext == "mp4":
         cmd += ["-movflags", "+faststart"]

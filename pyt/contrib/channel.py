@@ -1,21 +1,18 @@
 # -*- coding: utf-8 -*-
 """Module for interacting with a user's youtube channel."""
+
 import json
 import logging
 import warnings
 
-from typing import (
-    Dict,
-    List,
-    Optional,
-    Tuple
-)
+from typing import Dict, List, Optional, Tuple
 
 from pyt import extract, request
 from pyt.contrib.playlist import Playlist
 from pyt.helpers import uniqueify
 
 logger = logging.getLogger(__name__)
+
 
 class Channel(Playlist):
     """A YouTube channel feed.
@@ -40,23 +37,23 @@ class Channel(Playlist):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
             super().__init__(url, proxies)
-        
-         # Removes paths that comes after the channel handle.
+
+        # Removes paths that comes after the channel handle.
         if "channel" not in url:
-            self.channel_url = '/'.join((url.split("/")[:4]))
+            self.channel_url = "/".join((url.split("/")[:4]))
         else:
-            self.channel_url = '/'.join((url.split("/")[:5]))
-        
+            self.channel_url = "/".join((url.split("/")[:5]))
+
         if "channel" in self.channel_url:
-            self.channel_uri = "/" + '/'.join(self.channel_url.split("/")[-2:])
+            self.channel_uri = "/" + "/".join(self.channel_url.split("/")[-2:])
         else:
             self.channel_uri = "/" + self.channel_url.split("/")[-1]
 
-        self.videos_url = self.channel_url + '/videos'
-        self.playlists_url = self.channel_url + '/playlists'
-        self.community_url = self.channel_url + '/community'
-        self.featured_channels_url = self.channel_url + '/channels'
-        self.about_url = self.channel_url + '/about'
+        self.videos_url = self.channel_url + "/videos"
+        self.playlists_url = self.channel_url + "/playlists"
+        self.community_url = self.channel_url + "/community"
+        self.featured_channels_url = self.channel_url + "/channels"
+        self.about_url = self.channel_url + "/about"
 
         # Possible future additions
         self._playlists_html = None
@@ -70,7 +67,7 @@ class Channel(Playlist):
 
         :rtype: str
         """
-        return self.initial_data['metadata']['channelMetadataRenderer']['title']
+        return self.initial_data["metadata"]["channelMetadataRenderer"]["title"]
 
     @property
     def channel_id(self):
@@ -80,7 +77,7 @@ class Channel(Playlist):
 
         :rtype: str
         """
-        return self.initial_data['metadata']['channelMetadataRenderer']['externalId']
+        return self.initial_data["metadata"]["channelMetadataRenderer"]["externalId"]
 
     @property
     def vanity_url(self):
@@ -90,7 +87,9 @@ class Channel(Playlist):
 
         :rtype: str
         """
-        return self.initial_data['metadata']['channelMetadataRenderer'].get('vanityChannelUrl', None)  # noqa:E501
+        return self.initial_data["metadata"]["channelMetadataRenderer"].get(
+            "vanityChannelUrl", None
+        )  # noqa:E501
 
     @property
     def html(self):
@@ -173,36 +172,44 @@ class Channel(Playlist):
         # this is the json tree structure, if the json was extracted from
         # html
         try:
-            videos = initial_data["contents"][
-                "twoColumnBrowseResultsRenderer"][
-                "tabs"][1]["tabRenderer"]["content"][
-                "sectionListRenderer"]["contents"][0][
-                "itemSectionRenderer"]["contents"][0][
-                "gridRenderer"]["items"]
+            videos = initial_data["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][
+                1
+            ]["tabRenderer"]["content"]["sectionListRenderer"]["contents"][0][
+                "itemSectionRenderer"
+            ][
+                "contents"
+            ][
+                0
+            ][
+                "gridRenderer"
+            ][
+                "items"
+            ]
         except (KeyError, IndexError, TypeError):
             try:
                 # this is the json tree structure, if the json was directly sent
                 # by the server in a continuation response
-                important_content = initial_data[1]['response']['onResponseReceivedActions'][
-                    0
-                ]['appendContinuationItemsAction']['continuationItems']
+                important_content = initial_data[1]["response"][
+                    "onResponseReceivedActions"
+                ][0]["appendContinuationItemsAction"]["continuationItems"]
                 videos = important_content
             except (KeyError, IndexError, TypeError):
                 try:
                     # this is the json tree structure, if the json was directly sent
                     # by the server in a continuation response
                     # no longer a list and no longer has the "response" key
-                    important_content = initial_data['onResponseReceivedActions'][0][
-                        'appendContinuationItemsAction']['continuationItems']
+                    important_content = initial_data["onResponseReceivedActions"][0][
+                        "appendContinuationItemsAction"
+                    ]["continuationItems"]
                     videos = important_content
                 except (KeyError, IndexError, TypeError) as p:
                     logger.info(p)
                     return [], None
 
         try:
-            continuation = videos[-1]['continuationItemRenderer'][
-                'continuationEndpoint'
-            ]['continuationCommand']['token']
+            continuation = videos[-1]["continuationItemRenderer"][
+                "continuationEndpoint"
+            ]["continuationCommand"]["token"]
             videos = videos[:-1]
         except (KeyError, IndexError):
             # if there is an error, no continuation is available
@@ -214,11 +221,8 @@ class Channel(Playlist):
                 list(
                     # only extract the video ids from the video data
                     map(
-                        lambda x: (
-                            f"/watch?v="
-                            f"{x['gridVideoRenderer']['videoId']}"
-                        ),
-                        videos
+                        lambda x: (f"/watch?v=" f"{x['gridVideoRenderer']['videoId']}"),
+                        videos,
                     )
                 ),
             ),

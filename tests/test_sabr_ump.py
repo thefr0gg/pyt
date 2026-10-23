@@ -9,6 +9,7 @@ The varint scheme used here is RFC8794-style (5 size classes), NOT
 LEB128 / standard protobuf. Every size class gets its own round-trip
 test to catch off-by-one bugs at the boundaries.
 """
+
 from __future__ import annotations
 
 import io
@@ -28,28 +29,30 @@ from tests.sabr_fixtures import (
     make_ump_part,
 )
 
-
 # ── varint round-trips: every size class ─────────────────────────────────
 
 
-@pytest.mark.parametrize("value,expected_size", [
-    (0, 1),
-    (1, 1),
-    (127, 1),                  # last 1-byte value
-    (128, 2),                  # first 2-byte
-    (16_383, 2),               # last 2-byte
-    (16_384, 3),               # first 3-byte
-    (2_097_151, 3),            # last 3-byte
-    (2_097_152, 4),            # first 4-byte
-    (268_435_455, 4),          # last 4-byte (2^28 - 1)
-    (268_435_456, 5),          # first 5-byte (2^28)
-    ((1 << 32) - 1, 5),        # max 5-byte
-])
+@pytest.mark.parametrize(
+    "value,expected_size",
+    [
+        (0, 1),
+        (1, 1),
+        (127, 1),  # last 1-byte value
+        (128, 2),  # first 2-byte
+        (16_383, 2),  # last 2-byte
+        (16_384, 3),  # first 3-byte
+        (2_097_151, 3),  # last 3-byte
+        (2_097_152, 4),  # first 4-byte
+        (268_435_455, 4),  # last 4-byte (2^28 - 1)
+        (268_435_456, 5),  # first 5-byte (2^28)
+        ((1 << 32) - 1, 5),  # max 5-byte
+    ],
+)
 def test_varint_size_classes(value, expected_size):
     encoded = encode_ump_varint(value)
-    assert len(encoded) == expected_size, (
-        f"value {value}: expected {expected_size}-byte encoding, got {len(encoded)}"
-    )
+    assert (
+        len(encoded) == expected_size
+    ), f"value {value}: expected {expected_size}-byte encoding, got {len(encoded)}"
     decoded, pos = decode_ump_varint(encoded, 0)
     assert decoded == value
     assert pos == len(encoded)

@@ -1,4 +1,5 @@
 """The :class:`Video` — a typed facade backed by a raw InnerTube player response."""
+
 from __future__ import annotations
 
 import logging
@@ -72,14 +73,20 @@ class Video:
 
         video_id = _extract_video_id(url)
 
-        player_response, client_name, client_cfg, is_age_restricted = fetch_player_response(
-            video_id,
-            url,
-            use_oauth=use_oauth,
-            allow_oauth_cache=allow_oauth_cache,
+        player_response, client_name, client_cfg, is_age_restricted = (
+            fetch_player_response(
+                video_id,
+                url,
+                use_oauth=use_oauth,
+                allow_oauth_cache=allow_oauth_cache,
+            )
         )
 
-        logger.debug("Video._from_url: player response OK video_id=%s client=%s", video_id, client_name)
+        logger.debug(
+            "Video._from_url: player response OK video_id=%s client=%s",
+            video_id,
+            client_name,
+        )
 
         meta = _hydrate_meta(
             player_response,
@@ -183,16 +190,18 @@ class Video:
                 if not has_auth:
                     raise AgeRestricted(self.video_id, url=self.url)
 
-            logger.debug("video.streams: hydrating stream catalog for %s", self.video_id)
+            logger.debug(
+                "video.streams: hydrating stream catalog for %s", self.video_id
+            )
 
             po_token = None
             on_progress = None
             on_complete = None
             client = self._client
             if client is not None:
-                po_token = getattr(client, '_current_po_token', lambda: None)()
-                on_progress = getattr(client, '_on_progress', None)
-                on_complete = getattr(client, '_on_complete', None)
+                po_token = getattr(client, "_current_po_token", lambda: None)()
+                on_progress = getattr(client, "_on_progress", None)
+                on_complete = getattr(client, "_on_complete", None)
 
             raw_streams, sabr_config = hydrate_streams(
                 self._player_response,
@@ -202,7 +211,9 @@ class Video:
                 po_token=po_token,
                 on_progress=on_progress,
                 on_complete=on_complete,
-                duration=self._meta.length.total_seconds() if self._meta.length else None,
+                duration=(
+                    self._meta.length.total_seconds() if self._meta.length else None
+                ),
                 video_id=self.video_id,
                 title=self.title,
             )
@@ -210,7 +221,8 @@ class Video:
             self._streams = StreamSet._from_raw(raw_streams, video=self)
             logger.info(
                 "video.streams: %s catalog has %d streams",
-                self.video_id, len(self._streams),
+                self.video_id,
+                len(self._streams),
             )
         return self._streams
 
@@ -234,6 +246,42 @@ class Video:
             prefer_resolution=prefer_resolution,
         )
         return CombinedDownload(
+            video=self,
+            video_stream=video_stream,
+            audio_stream=audio_stream,
+            output_path=output_path,
+            filename=filename,
+            container=container,
+            timeout=timeout,
+        )
+
+    def download_live(
+        self,
+        output_path: Optional[str] = None,
+        *,
+        prefer_resolution: Optional[str] = None,
+        filename: Optional[str] = None,
+        container: Optional[str] = None,
+        timeout: Optional[int] = None,
+    ):
+        """Capture an active live broadcast via a native SABR session,
+        chasing the live edge until stopped, then merge with ffmpeg.
+
+        Call :meth:`LiveDownload.stop` (e.g. from a signal handler) to end
+        the capture cleanly. Unlike :meth:`record_live`, this uses pyt's
+        own SABR/UMP implementation instead of shelling out to ffmpeg for
+        the capture itself — ffmpeg is still used for the final mux.
+        :meth:`record_live` remains the more broadly compatible fallback.
+        """
+        from pyt.api.live_download import LiveDownload
+
+        if not self.is_live:
+            raise LiveStreamNotSupported(self.video_id, url=self.url)
+
+        video_stream, audio_stream = self.streams.best_pair(
+            prefer_resolution=prefer_resolution,
+        )
+        return LiveDownload(
             video=self,
             video_stream=video_stream,
             audio_stream=audio_stream,
@@ -272,10 +320,13 @@ class Video:
                 "Install with `pyt --doctor --install ffmpeg`."
             )
 
-        safe_title = "".join(
-            c if c.isalnum() or c in " ._-" else "_"
-            for c in (self.title or self.video_id)
-        ).strip() or self.video_id
+        safe_title = (
+            "".join(
+                c if c.isalnum() or c in " ._-" else "_"
+                for c in (self.title or self.video_id)
+            ).strip()
+            or self.video_id
+        )
         out_filename = filename or f"{safe_title}.ts"
 
         if output_path is None:
@@ -291,7 +342,9 @@ class Video:
 
         logger.info(
             "Video.record_live: recording %s -> %s (timeout=%s)",
-            self.video_id, dest, timeout,
+            self.video_id,
+            dest,
+            timeout,
         )
         try:
             subprocess.run(cmd, check=True)  # nosec
@@ -351,8 +404,7 @@ def _hydrate_meta(
     published_at: Optional[datetime] = None
     try:
         pub_str = (
-            player_response
-            .get("microformat", {})
+            player_response.get("microformat", {})
             .get("playerMicroformatRenderer", {})
             .get("publishDate")
         )

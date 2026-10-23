@@ -1,6 +1,7 @@
 """Tests for the doctor module: tool detection, feature derivation,
 URL selection, and the install orchestration. No real network — the
 download function is always mocked."""
+
 from __future__ import annotations
 
 import io
@@ -14,7 +15,6 @@ import pytest
 
 from pyt.api import _paths
 from pyt.api import doctor
-
 
 # ── _paths bootstrap ───────────────────────────────────────────────────────
 
@@ -48,17 +48,21 @@ def test_ensure_bin_on_path_does_not_duplicate(monkeypatch):
 # ── platform key normalization ─────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("system,machine,expected", [
-    ("Windows", "AMD64", ("windows", "x86_64")),
-    ("Windows", "x86_64", ("windows", "x86_64")),
-    ("Linux", "x86_64", ("linux", "x86_64")),
-    ("Linux", "aarch64", ("linux", "arm64")),
-    ("Darwin", "arm64", ("darwin", "arm64")),
-    ("Darwin", "x86_64", ("darwin", "x86_64")),
-])
+@pytest.mark.parametrize(
+    "system,machine,expected",
+    [
+        ("Windows", "AMD64", ("windows", "x86_64")),
+        ("Windows", "x86_64", ("windows", "x86_64")),
+        ("Linux", "x86_64", ("linux", "x86_64")),
+        ("Linux", "aarch64", ("linux", "arm64")),
+        ("Darwin", "arm64", ("darwin", "arm64")),
+        ("Darwin", "x86_64", ("darwin", "x86_64")),
+    ],
+)
 def test_platform_key_normalizes_arch(system, machine, expected):
-    with mock.patch("pyt.api.doctor.platform.system", return_value=system), \
-         mock.patch("pyt.api.doctor.platform.machine", return_value=machine):
+    with mock.patch("pyt.api.doctor.platform.system", return_value=system), mock.patch(
+        "pyt.api.doctor.platform.machine", return_value=machine
+    ):
         assert doctor._platform_key() == expected
 
 
@@ -67,14 +71,18 @@ def test_platform_key_normalizes_arch(system, machine, expected):
 
 def test_detect_returns_path_and_version_when_found():
     tool = doctor.Tool(
-        name="ffmpeg", binary="ffmpeg", description="x", required_for=[],
+        name="ffmpeg",
+        binary="ffmpeg",
+        description="x",
+        required_for=[],
         install_url=None,
     )
-    with mock.patch("pyt.api.doctor.shutil.which", return_value="/usr/bin/ffmpeg"), \
-         mock.patch(
-             "pyt.api.doctor.subprocess.run",
-             return_value=mock.Mock(stdout=b"ffmpeg version 7.1\n", stderr=b""),
-         ):
+    with mock.patch(
+        "pyt.api.doctor.shutil.which", return_value="/usr/bin/ffmpeg"
+    ), mock.patch(
+        "pyt.api.doctor.subprocess.run",
+        return_value=mock.Mock(stdout=b"ffmpeg version 7.1\n", stderr=b""),
+    ):
         result = doctor.detect(tool)
     assert result.found
     assert result.path == "/usr/bin/ffmpeg"
@@ -83,7 +91,10 @@ def test_detect_returns_path_and_version_when_found():
 
 def test_detect_returns_not_found_when_missing():
     tool = doctor.Tool(
-        name="ffmpeg", binary="ffmpeg", description="x", required_for=[],
+        name="ffmpeg",
+        binary="ffmpeg",
+        description="x",
+        required_for=[],
         install_url=None,
     )
     with mock.patch("pyt.api.doctor.shutil.which", return_value=None):
@@ -117,8 +128,12 @@ def test_get_version_truncates_long_lines():
 
 def _fake_tool(name, found):
     return doctor.Tool(
-        name=name, binary=name, description="", required_for=[],
-        install_url=None, found=found,
+        name=name,
+        binary=name,
+        description="",
+        required_for=[],
+        install_url=None,
+        found=found,
     )
 
 
@@ -127,14 +142,26 @@ def test_features_all_available_when_everything_installed():
     # at least one of them being present.
     tools = [
         _fake_tool(n, True)
-        for n in ("ffmpeg", "ffprobe", "realesrgan", "node", "bun", "deno", "bgutil-pot")
+        for n in (
+            "ffmpeg",
+            "ffprobe",
+            "realesrgan",
+            "node",
+            "bun",
+            "deno",
+            "bgutil-pot",
+        )
     ]
     features = doctor.feature_status(tools)
     assert all(f.available for f in features)
 
 
 def test_features_disable_realesrgan_when_binary_missing():
-    tools = [_fake_tool("ffmpeg", True), _fake_tool("ffprobe", True), _fake_tool("realesrgan", False)]
+    tools = [
+        _fake_tool("ffmpeg", True),
+        _fake_tool("ffprobe", True),
+        _fake_tool("realesrgan", False),
+    ]
     features = doctor.feature_status(tools)
     by_name = {f.name: f for f in features}
     assert not by_name["Upscale (algorithm='realesrgan')"].available
@@ -143,7 +170,11 @@ def test_features_disable_realesrgan_when_binary_missing():
 
 
 def test_features_disable_almost_everything_without_ffmpeg():
-    tools = [_fake_tool("ffmpeg", False), _fake_tool("ffprobe", False), _fake_tool("realesrgan", True)]
+    tools = [
+        _fake_tool("ffmpeg", False),
+        _fake_tool("ffprobe", False),
+        _fake_tool("realesrgan", True),
+    ]
     features = doctor.feature_status(tools)
     by_name = {f.name: f for f in features}
     # Stream download works even without ffmpeg.
@@ -262,9 +293,9 @@ def test_install_realesrgan_full_pipeline(tmp_path, monkeypatch):
         copy_archive_dir=True,
     )
 
-    with mock.patch("pyt.api.doctor.plan_install", return_value=plan), \
-         mock.patch("pyt.api.doctor._download", side_effect=fake_download), \
-         mock.patch("pyt.api.doctor._verify", return_value=True):
+    with mock.patch("pyt.api.doctor.plan_install", return_value=plan), mock.patch(
+        "pyt.api.doctor._download", side_effect=fake_download
+    ), mock.patch("pyt.api.doctor._verify", return_value=True):
         result = doctor.install("realesrgan")
 
     assert result == fake_pyt_bin / binary_name
@@ -297,8 +328,9 @@ def test_install_raises_when_binary_missing_from_archive(tmp_path, monkeypatch):
         extra_files=[],
     )
 
-    with mock.patch("pyt.api.doctor.plan_install", return_value=plan), \
-         mock.patch("pyt.api.doctor._download", side_effect=fake_download):
+    with mock.patch("pyt.api.doctor.plan_install", return_value=plan), mock.patch(
+        "pyt.api.doctor._download", side_effect=fake_download
+    ):
         with pytest.raises(doctor.InstallError, match="could not locate"):
             doctor.install("realesrgan")
 
@@ -323,9 +355,9 @@ def test_install_raises_when_verify_fails(tmp_path, monkeypatch):
         extra_files=[],
     )
 
-    with mock.patch("pyt.api.doctor.plan_install", return_value=plan), \
-         mock.patch("pyt.api.doctor._download", side_effect=fake_download), \
-         mock.patch("pyt.api.doctor._verify", return_value=False):
+    with mock.patch("pyt.api.doctor.plan_install", return_value=plan), mock.patch(
+        "pyt.api.doctor._download", side_effect=fake_download
+    ), mock.patch("pyt.api.doctor._verify", return_value=False):
         with pytest.raises(doctor.InstallError, match="sanity-check"):
             doctor.install("realesrgan")
     # Rollback: the binary should NOT be left behind.
@@ -371,8 +403,9 @@ def test_install_po_token_generator_rejects_old_node(tmp_path, monkeypatch):
             return mock.Mock(stdout=b"v16.20.0\n", returncode=0)
         return mock.Mock(returncode=0)
 
-    with mock.patch("pyt.api.doctor.shutil.which", side_effect=_which), \
-         mock.patch("pyt.api.doctor.subprocess.run", side_effect=_run):
+    with mock.patch("pyt.api.doctor.shutil.which", side_effect=_which), mock.patch(
+        "pyt.api.doctor.subprocess.run", side_effect=_run
+    ):
         with pytest.raises(doctor.InstallError, match="Node 18"):
             doctor._install_po_token_generator()
 
@@ -402,8 +435,9 @@ def test_install_po_token_generator_full_pipeline(tmp_path, monkeypatch):
             return mock.Mock(returncode=0)
         return mock.Mock(returncode=0)
 
-    with mock.patch("pyt.api.doctor.shutil.which", side_effect=_which), \
-         mock.patch("pyt.api.doctor.subprocess.run", side_effect=_run):
+    with mock.patch("pyt.api.doctor.shutil.which", side_effect=_which), mock.patch(
+        "pyt.api.doctor.subprocess.run", side_effect=_run
+    ):
         wrapper_path = doctor._install_po_token_generator()
 
     # Wrapper sits at the expected location.
@@ -449,8 +483,9 @@ def test_install_po_token_generator_npm_install_failure(tmp_path, monkeypatch):
             raise subprocess.CalledProcessError(1, cmd, stderr=b"network error")
         return mock.Mock(returncode=0)
 
-    with mock.patch("pyt.api.doctor.shutil.which", side_effect=_which), \
-         mock.patch("pyt.api.doctor.subprocess.run", side_effect=_run):
+    with mock.patch("pyt.api.doctor.shutil.which", side_effect=_which), mock.patch(
+        "pyt.api.doctor.subprocess.run", side_effect=_run
+    ):
         with pytest.raises(doctor.InstallError, match="npm install failed"):
             doctor._install_po_token_generator()
 
@@ -477,13 +512,16 @@ def test_install_po_token_generator_verify_failure_rolls_back(tmp_path, monkeypa
             return mock.Mock(returncode=0)
         return mock.Mock(returncode=0)
 
-    with mock.patch("pyt.api.doctor.shutil.which", side_effect=_which), \
-         mock.patch("pyt.api.doctor.subprocess.run", side_effect=_run):
+    with mock.patch("pyt.api.doctor.shutil.which", side_effect=_which), mock.patch(
+        "pyt.api.doctor.subprocess.run", side_effect=_run
+    ):
         with pytest.raises(doctor.InstallError, match="verification call failed"):
             doctor._install_po_token_generator()
 
 
-def test_install_po_token_generator_dispatched_via_install_function(tmp_path, monkeypatch):
+def test_install_po_token_generator_dispatched_via_install_function(
+    tmp_path, monkeypatch
+):
     """`doctor.install("po-token-generator")` reaches the special-case
     path rather than trying plan_install."""
     monkeypatch.setattr(doctor, "pyt_data_dir", lambda: tmp_path / ".pyt")
@@ -521,8 +559,9 @@ def test_install_translates_download_failure(tmp_path, monkeypatch):
     def fake_download(url, target, *, on_progress=None):
         raise ConnectionError("network unavailable")
 
-    with mock.patch("pyt.api.doctor.plan_install", return_value=plan), \
-         mock.patch("pyt.api.doctor._download", side_effect=fake_download):
+    with mock.patch("pyt.api.doctor.plan_install", return_value=plan), mock.patch(
+        "pyt.api.doctor._download", side_effect=fake_download
+    ):
         with pytest.raises(doctor.InstallError, match="download failed"):
             doctor.install("realesrgan")
 

@@ -583,21 +583,32 @@ What's missing / works but not great:
   `ATTESTATION_REQUIRED`. See
   [docs/features/po-token.md](docs/features/po-token.md) for the full
   workflow.
-- **Live streams.** Metadata yes, downloads no. SABR live needs `SABR_SEEK` /
-  `LIVE_METADATA` handling we haven't wired up.
-- **Multi-format download orchestrator** — done in the new API. Use
-  `video.download_best(...)` (or construct `pyt.CombinedDownload` directly)
-  to run video+audio over a single multiplexed SABR session, with a
-  byte-range fallback for whatever bytes SABR doesn't deliver. The legacy
-  `Stream.download()` path still opens one session per stream; no plans
-  to back-port — migrate to `Client.video(...).download_best(...)`.
-- **Tests on recorded UMP fixtures** — done. The SABR + UMP layers
-  have 80+ fixture-driven tests covering single-format completion,
-  multi-format multiplex, attestation, redirects, error-then-refresh,
-  ad-scope backoff (and the cap-outside-ads behavior that keeps VOD
-  downloads from crawling), playback-cookie propagation, stall
-  detection, gzip-encoded responses, context-update sending policies,
-  and player-time advancement to the buffered edge. Builders live in
+- **Live streams.** `video.download_live(...)` now chases the live edge
+  over a native SABR session — `SABR_SEEK` resets buffered state to the
+  server-directed position, and the session stops cleanly via `.stop()`
+  (Ctrl-C) or a recognized broadcast-end signal. `LIVE_METADATA` is parsed
+  but not yet acted on: its wire layout isn't documented anywhere we could
+  find, so it's inert for now (logged, not interpreted) until it's
+  reverse-engineered against real traffic. `video.record_live(...)`
+  (ffmpeg over the HLS manifest) remains the simpler, more broadly
+  compatible fallback for live configurations SABR live doesn't cover yet.
+
+The two items below are complete; kept here because the SABR layer
+grew enough that calling it out seemed worth it:
+
+- **Multi-format download orchestrator.** `video.download_best(...)` (or
+  construct `pyt.CombinedDownload` directly) runs video+audio over a
+  single multiplexed SABR session, with a byte-range fallback for whatever
+  bytes SABR doesn't deliver. The legacy `Stream.download()` path still
+  opens one session per stream; no plans to back-port — migrate to
+  `Client.video(...).download_best(...)`.
+- **Tests on recorded UMP fixtures.** The SABR + UMP layers have 90+
+  fixture-driven tests covering single-format completion, multi-format
+  multiplex, attestation, redirects, error-then-refresh, ad-scope backoff
+  (and the cap-outside-ads behavior that keeps VOD downloads from
+  crawling), playback-cookie propagation, stall detection, gzip-encoded
+  responses, context-update sending policies, live-edge chasing, and
+  player-time advancement to the buffered edge. Builders live in
   `tests/sabr_fixtures.py` so adding scenarios is one-liner work.
 
 If something downloads slow or 403s, file an issue with the URL and your
@@ -613,8 +624,11 @@ turnaround is days-to-weeks, not hours.
 - **po_token** — YouTube's browser-attestation token is not generated
   here. If a video returns 403s on web-client streams it falls back to
   the mobile client, which usually works without it.
-- **Live streams** — metadata is accessible but downloading live HLS/DASH
-  is not supported.
+- **Live streams** — `download_live()` works for the common case, but
+  `LIVE_METADATA` isn't decoded yet (unconfirmed wire layout) and broadcast-end
+  detection relies on a heuristic match against `SABR_ERROR`'s type string
+  that hasn't been confirmed against real traffic. See
+  [docs/features/live-streaming.md](docs/features/live-streaming.md).
 
 ---
 

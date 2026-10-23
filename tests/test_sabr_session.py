@@ -18,6 +18,7 @@ coverage on:
 We patch ``time.sleep`` everywhere — even when SabrSession honors a
 backoff, we don't want the tests to actually sleep.
 """
+
 from __future__ import annotations
 
 from unittest import mock
@@ -46,7 +47,6 @@ from tests.sabr_fixtures import (
     make_sabr_redirect,
     make_stream_protection_status,
 )
-
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -101,8 +101,12 @@ def test_single_format_init_then_one_segment():
         make_media_end(header_id=1),
         # Data seg
         make_media_header(
-            header_id=2, itag=140, sequence_number=1,
-            content_length=10, start_ms=0, duration_ms=5000,
+            header_id=2,
+            itag=140,
+            sequence_number=1,
+            content_length=10,
+            start_ms=0,
+            duration_ms=5000,
         ),
         make_media(header_id=2, data=b"AUDIODATA0"),
         make_media_end(header_id=2),
@@ -185,7 +189,7 @@ def test_multi_format_unrequested_format_is_dropped():
     the bytes for a format we did request."""
     body = build_multi_format_response(
         formats=[
-            (1, 137, b"VIDEO_BYTES"),    # we want this
+            (1, 137, b"VIDEO_BYTES"),  # we want this
             (2, 251, b"UNWANTED_AUDIO"),  # we did NOT request this itag
         ],
         end_segment_index=1,
@@ -221,7 +225,10 @@ def test_attestation_pending_does_not_raise():
     delivery so the session has a way to terminate."""
     r1 = make_stream_protection_status(2)
     r2 = build_segment_response(
-        header_id=1, itag=140, sequence_number=1, data=b"OK",
+        header_id=1,
+        itag=140,
+        sequence_number=1,
+        data=b"OK",
         end_segment_index=1,
     )
     session = SabrSession(
@@ -242,7 +249,10 @@ def test_redirect_sends_next_round_to_new_url():
     redirect_url = "https://sabr.test/play-redirected"
     r1 = make_sabr_redirect(redirect_url)
     r2 = build_segment_response(
-        header_id=1, itag=140, sequence_number=1, data=b"DATA",
+        header_id=1,
+        itag=140,
+        sequence_number=1,
+        data=b"DATA",
         end_segment_index=1,
     )
 
@@ -285,7 +295,10 @@ def test_sabr_error_lapsed_triggers_refresh_callback():
 
     r1 = make_sabr_error(type="server.token_lapsed")
     r2 = build_segment_response(
-        header_id=1, itag=140, sequence_number=1, data=b"OK",
+        header_id=1,
+        itag=140,
+        sequence_number=1,
+        data=b"OK",
         end_segment_index=1,
     )
 
@@ -368,9 +381,9 @@ def test_next_request_policy_backoff_capped_outside_ads():
     # 5s was capped to ≤ 200ms.
     sleep_calls = [c.args[0] for c in fake_sleep.call_args_list if c.args[0] > 0]
     assert sleep_calls, "expected at least one backoff sleep"
-    assert max(sleep_calls) <= 0.2, (
-        f"backoff was {max(sleep_calls)}s — should be capped at 0.2s outside ads"
-    )
+    assert (
+        max(sleep_calls) <= 0.2
+    ), f"backoff was {max(sleep_calls)}s — should be capped at 0.2s outside ads"
 
 
 def test_next_request_policy_backoff_full_during_ads():
@@ -383,8 +396,10 @@ def test_next_request_policy_backoff_full_during_ads():
     r1 = concat_parts(
         make_format_init(itag=140, total_segments=2),
         make_sabr_context_update(
-            type=42, scope=4,  # 4 = CONTENT_ADS
-            value=b"\x01", send_by_default=True,
+            type=42,
+            scope=4,  # 4 = CONTENT_ADS
+            value=b"\x01",
+            send_by_default=True,
         ),
         make_next_request_policy(backoff_time_ms=1500),
         make_media_header(header_id=1, itag=140, sequence_number=1),
@@ -415,16 +430,16 @@ def test_next_request_policy_backoff_full_during_ads():
 
     sleep_calls = [c.args[0] for c in fake_sleep.call_args_list if c.args[0] > 0]
     # During an ad, we honor the full 1.5s.
-    assert any(0.9 < s < 2.0 for s in sleep_calls), (
-        f"expected ad-scoped backoff to honor 1.5s; got {sleep_calls}"
-    )
+    assert any(
+        0.9 < s < 2.0 for s in sleep_calls
+    ), f"expected ad-scoped backoff to honor 1.5s; got {sleep_calls}"
 
 
 def test_next_request_policy_records_playback_cookie():
     """Subsequent requests should carry the playback_cookie issued by
     the server. We verify by checking the request body of round 2
     contains the cookie bytes."""
-    cookie_bytes = b"\xCA\xFE\xBA\xBE"
+    cookie_bytes = b"\xca\xfe\xba\xbe"
     r1 = concat_parts(
         make_format_init(itag=140, total_segments=2),
         make_next_request_policy(playback_cookie=cookie_bytes),
@@ -458,9 +473,9 @@ def test_next_request_policy_records_playback_cookie():
 
     # The round-2 request body should contain the cookie bytes
     # somewhere inside the StreamerContext message.
-    assert cookie_bytes in captured_bodies[1], (
-        "expected the playback_cookie to appear in the second request's body"
-    )
+    assert (
+        cookie_bytes in captured_bodies[1]
+    ), "expected the playback_cookie to appear in the second request's body"
     # But not in round 1 (we hadn't received the cookie yet).
     assert cookie_bytes not in captured_bodies[0]
 
@@ -491,11 +506,12 @@ def test_empty_round_with_backoff_does_not_count_toward_stall():
     not raise."""
     # Many rounds that all have a backoff signal but no media. Then a
     # final round that delivers and ends.
-    backoff_rounds = [
-        make_next_request_policy(backoff_time_ms=10) for _ in range(20)
-    ]
+    backoff_rounds = [make_next_request_policy(backoff_time_ms=10) for _ in range(20)]
     final = build_segment_response(
-        header_id=1, itag=140, sequence_number=1, data=b"X",
+        header_id=1,
+        itag=140,
+        sequence_number=1,
+        data=b"X",
         end_segment_index=1,
     )
     session = SabrSession(
@@ -515,7 +531,10 @@ def test_gzip_encoded_response_is_decoded():
     must transparently decompress them; otherwise UMP parsing reads
     binary noise."""
     body = build_segment_response(
-        header_id=1, itag=140, sequence_number=1, data=b"COMPRESSED",
+        header_id=1,
+        itag=140,
+        sequence_number=1,
+        data=b"COMPRESSED",
         end_segment_index=1,
     )
     gzipped = gzip_wrap(body)
@@ -537,7 +556,7 @@ def test_sabr_context_sending_policy_starts_then_stops_send():
     then start sending it via a sending policy, then stop. Verify the
     state transitions don't leak: after stop_policy, the context is
     NOT included in subsequent requests."""
-    ctx_value = b"\xDE\xAD"
+    ctx_value = b"\xde\xad"
 
     # Round 1: register a context (not sent by default), tell us to
     # start sending it, deliver a segment so the loop continues.
@@ -583,8 +602,12 @@ def test_sabr_context_sending_policy_starts_then_stops_send():
 
     # Round 2 (after start_policy): the value should be in the request body.
     # Round 3 (after stop_policy): the value should NOT appear.
-    assert ctx_value in captured_bodies[1], "context bytes should be sent after start_policy"
-    assert ctx_value not in captured_bodies[2], "context bytes should NOT be sent after stop_policy"
+    assert (
+        ctx_value in captured_bodies[1]
+    ), "context bytes should be sent after start_policy"
+    assert (
+        ctx_value not in captured_bodies[2]
+    ), "context bytes should NOT be sent after stop_policy"
 
 
 # ── Player time advancement ─────────────────────────────────────────────
@@ -599,8 +622,11 @@ def test_player_time_advances_to_buffered_end_ms():
     r1 = concat_parts(
         make_format_init(itag=140, total_segments=3),
         make_media_header(
-            header_id=1, itag=140, sequence_number=1,
-            start_ms=0, duration_ms=5000,
+            header_id=1,
+            itag=140,
+            sequence_number=1,
+            start_ms=0,
+            duration_ms=5000,
         ),
         make_media(header_id=1, data=b"AAAA"),
         make_media_end(header_id=1),
@@ -608,16 +634,22 @@ def test_player_time_advances_to_buffered_end_ms():
     # Round 2: deliver another 5-second segment, at start_ms=5000.
     r2 = concat_parts(
         make_media_header(
-            header_id=2, itag=140, sequence_number=2,
-            start_ms=5000, duration_ms=5000,
+            header_id=2,
+            itag=140,
+            sequence_number=2,
+            start_ms=5000,
+            duration_ms=5000,
         ),
         make_media(header_id=2, data=b"BBBB"),
         make_media_end(header_id=2),
     )
     r3 = concat_parts(
         make_media_header(
-            header_id=3, itag=140, sequence_number=3,
-            start_ms=10000, duration_ms=5000,
+            header_id=3,
+            itag=140,
+            sequence_number=3,
+            start_ms=10000,
+            duration_ms=5000,
         ),
         make_media(header_id=3, data=b"CCCC"),
         make_media_end(header_id=3),
@@ -661,8 +693,11 @@ def test_media_header_with_unsupported_compression_raises():
     rather than emit garbage. yt-dlp does the same."""
     body = concat_parts(
         make_media_header(
-            header_id=1, itag=140, sequence_number=1,
-            content_length=4, compression=2,  # 2 = GZIP
+            header_id=1,
+            itag=140,
+            sequence_number=1,
+            content_length=4,
+            compression=2,  # 2 = GZIP
         ),
         make_media(header_id=1, data=b"AAAA"),
         make_media_end(header_id=1),
@@ -687,7 +722,10 @@ def test_resume_state_seeds_buffered_ranges():
     from pyt.sabr.session import _ResumeState
 
     r1 = build_segment_response(
-        header_id=1, itag=140, sequence_number=3, data=b"NEW",
+        header_id=1,
+        itag=140,
+        sequence_number=3,
+        data=b"NEW",
         end_segment_index=3,
     )
     session = SabrSession(

@@ -1,8 +1,7 @@
 """Library specific exception definitions."""
-from typing import (
-    Pattern,
-    Union
-)
+
+from typing import Pattern, Union
+
 
 class PytError(Exception):
     """Base pyt exception that all others inherit.
@@ -42,6 +41,7 @@ class RegexMatchError(ExtractError):
 
 class VideoUnavailable(PytError):
     """Base video unavailable error."""
+
     def __init__(self, video_id: str):
         """
         :param str video_id:
@@ -52,11 +52,12 @@ class VideoUnavailable(PytError):
 
     @property
     def error_string(self):
-        return f'{self.video_id} is unavailable'
+        return f"{self.video_id} is unavailable"
 
 
 class AgeRestrictedError(VideoUnavailable):
     """Video is age restricted, and cannot be accessed without OAuth."""
+
     def __init__(self, video_id: str):
         """
         :param str video_id:
@@ -72,6 +73,7 @@ class AgeRestrictedError(VideoUnavailable):
 
 class LiveStreamError(VideoUnavailable):
     """Video is a live stream."""
+
     def __init__(self, video_id: str):
         """
         :param str video_id:
@@ -82,7 +84,7 @@ class LiveStreamError(VideoUnavailable):
 
     @property
     def error_string(self):
-        return f'{self.video_id} is streaming live and cannot be loaded'
+        return f"{self.video_id} is streaming live and cannot be loaded"
 
 
 class VideoPrivate(VideoUnavailable):
@@ -96,7 +98,7 @@ class VideoPrivate(VideoUnavailable):
 
     @property
     def error_string(self):
-        return f'{self.video_id} is a private video'
+        return f"{self.video_id} is a private video"
 
 
 class RecordingUnavailable(VideoUnavailable):
@@ -110,7 +112,7 @@ class RecordingUnavailable(VideoUnavailable):
 
     @property
     def error_string(self):
-        return f'{self.video_id} does not have a live stream recording available'
+        return f"{self.video_id} does not have a live stream recording available"
 
 
 class MembersOnly(VideoUnavailable):
@@ -120,6 +122,7 @@ class MembersOnly(VideoUnavailable):
     subscribed to a content creator.
     ref: https://support.google.com/youtube/answer/7544492?hl=en
     """
+
     def __init__(self, video_id: str):
         """
         :param str video_id:
@@ -130,7 +133,7 @@ class MembersOnly(VideoUnavailable):
 
     @property
     def error_string(self):
-        return f'{self.video_id} is a members-only video'
+        return f"{self.video_id} is a members-only video"
 
 
 class VideoRegionBlocked(VideoUnavailable):
@@ -144,4 +147,4 @@ class VideoRegionBlocked(VideoUnavailable):
 
     @property
     def error_string(self):
-        return f'{self.video_id} is not available in your region'
+        return f"{self.video_id} is not available in your region"

@@ -1,4 +1,5 @@
 """Cookie loading and installation for pyt."""
+
 from __future__ import annotations
 
 import http.cookiejar
@@ -10,7 +11,13 @@ import browser_cookie3
 logger = logging.getLogger(__name__)
 
 _SUPPORTED_BROWSERS = (
-    "chrome", "chromium", "firefox", "brave", "edge", "safari", "opera",
+    "chrome",
+    "chromium",
+    "firefox",
+    "brave",
+    "edge",
+    "safari",
+    "opera",
 )
 
 
@@ -68,7 +75,13 @@ def install_cookies(jar: http.cookiejar.CookieJar) -> None:
 
     opener = ureq.build_opener(ureq.HTTPCookieProcessor(jar))
 
-    def _patched(url, method=None, headers=None, data=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
+    def _patched(
+        url,
+        method=None,
+        headers=None,
+        data=None,
+        timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
+    ):
         base = {"User-Agent": "Mozilla/5.0", "accept-language": "en-US,en"}
         if headers:
             base.update(headers)

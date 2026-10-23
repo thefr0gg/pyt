@@ -3,6 +3,7 @@
 Only wire types 0 (varint), 2 (len-delimited), and 5 (32-bit) are needed.
 No external dependencies.
 """
+
 import struct
 
 
@@ -42,7 +43,7 @@ def field_bytes(field_num: int, data: bytes) -> bytes:
 
 
 def field_string(field_num: int, s: str) -> bytes:
-    return field_bytes(field_num, s.encode('utf-8'))
+    return field_bytes(field_num, s.encode("utf-8"))
 
 
 def field_message(field_num: int, msg: bytes) -> bytes:
@@ -57,14 +58,14 @@ def read_field(data: bytes, pos: int) -> tuple:
     if wire_type == 0:
         value, pos = decode_varint(data, pos)
     elif wire_type == 1:
-        value = struct.unpack_from('<Q', data, pos)[0]
+        value = struct.unpack_from("<Q", data, pos)[0]
         pos += 8
     elif wire_type == 2:
         length, pos = decode_varint(data, pos)
-        value = data[pos:pos + length]
+        value = data[pos : pos + length]
         pos += length
     elif wire_type == 5:
-        value = struct.unpack_from('<I', data, pos)[0]
+        value = struct.unpack_from("<I", data, pos)[0]
         pos += 4
     else:
         raise ValueError(f"Unknown wire type {wire_type} in field {field_num}")

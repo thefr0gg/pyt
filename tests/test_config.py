@@ -1,4 +1,5 @@
 """Tests for pyt.config — load_config and apply_config."""
+
 import argparse
 import os
 
@@ -6,17 +7,19 @@ import pytest
 
 from pyt.config import load_config, apply_config, _LOCATIONS
 
-
 # ── load_config ───────────────────────────────────────────────────────────────
+
 
 def test_load_config_returns_empty_when_no_file(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     # Patch all search locations to non-existent paths inside tmp_path
     monkeypatch.setattr(
         "pyt.config._LOCATIONS",
-        [str(tmp_path / "pyt.conf"),
-         str(tmp_path / "xdg" / "pyt.conf"),
-         str(tmp_path / ".pyt.conf")],
+        [
+            str(tmp_path / "pyt.conf"),
+            str(tmp_path / "xdg" / "pyt.conf"),
+            str(tmp_path / ".pyt.conf"),
+        ],
     )
     result = load_config()
     assert result == {}
@@ -24,8 +27,9 @@ def test_load_config_returns_empty_when_no_file(tmp_path, monkeypatch):
 
 def test_load_config_reads_default_section(tmp_path, monkeypatch):
     conf = tmp_path / "pyt.conf"
-    conf.write_text("[default]\ntarget = ~/Downloads\nembed_metadata = true\n",
-                    encoding="utf-8")
+    conf.write_text(
+        "[default]\ntarget = ~/Downloads\nembed_metadata = true\n", encoding="utf-8"
+    )
     monkeypatch.setattr("pyt.config._LOCATIONS", [str(conf)])
     result = load_config()
     assert result["target"] == "~/Downloads"
@@ -46,8 +50,7 @@ def test_load_config_skips_missing_and_uses_second(tmp_path, monkeypatch):
     missing = tmp_path / "missing.conf"
     present = tmp_path / "present.conf"
     present.write_text("[default]\ntarget = here\n", encoding="utf-8")
-    monkeypatch.setattr("pyt.config._LOCATIONS",
-                        [str(missing), str(present)])
+    monkeypatch.setattr("pyt.config._LOCATIONS", [str(missing), str(present)])
     result = load_config()
     assert result["target"] == "here"
 
@@ -62,16 +65,33 @@ def test_load_config_no_default_section_returns_empty(tmp_path, monkeypatch):
 
 # ── apply_config ──────────────────────────────────────────────────────────────
 
+
 def _args(**kwargs):
     ns = argparse.Namespace(
-        target=None, output=None, verbose=False, embed_metadata=False,
-        embed_thumbnail=False, embed_subs=False, extract_audio=False,
-        audio_format=None, proxy=None, cookies=None,
-        cookies_from_browser=None, download_archive=None, batch_file=None,
-        caption_code=None, resolution=None, audio=None, ffmpeg=None,
-        sponsorblock_mark=None, sponsorblock_remove=None,
-        sleep_interval=None, max_sleep_interval=None,
-        geo_bypass=False, geo_bypass_country=None, itag=None,
+        target=None,
+        output=None,
+        verbose=False,
+        embed_metadata=False,
+        embed_thumbnail=False,
+        embed_subs=False,
+        extract_audio=False,
+        audio_format=None,
+        proxy=None,
+        cookies=None,
+        cookies_from_browser=None,
+        download_archive=None,
+        batch_file=None,
+        caption_code=None,
+        resolution=None,
+        audio=None,
+        ffmpeg=None,
+        sponsorblock_mark=None,
+        sponsorblock_remove=None,
+        sleep_interval=None,
+        max_sleep_interval=None,
+        geo_bypass=False,
+        geo_bypass_country=None,
+        itag=None,
     )
     for k, v in kwargs.items():
         setattr(ns, k, v)
@@ -112,12 +132,15 @@ def test_apply_config_does_not_override_truthy_bool():
 
 def test_apply_config_multiple_keys():
     args = _args()
-    apply_config(args, {
-        "target": "~/Music",
-        "audio_format": "mp3",
-        "embed_metadata": "true",
-        "sleep_interval": "2",
-    })
+    apply_config(
+        args,
+        {
+            "target": "~/Music",
+            "audio_format": "mp3",
+            "embed_metadata": "true",
+            "sleep_interval": "2",
+        },
+    )
     assert args.target == "~/Music"
     assert args.audio_format == "mp3"
     assert args.embed_metadata is True

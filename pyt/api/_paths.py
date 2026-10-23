@@ -10,6 +10,7 @@ the managed copy up automatically.
 The mutation is process-local: it never touches the user's shell
 profile or system PATH.
 """
+
 from __future__ import annotations
 
 import os

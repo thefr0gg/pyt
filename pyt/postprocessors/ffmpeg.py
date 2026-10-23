@@ -1,4 +1,5 @@
 """FFmpeg-based post-processor base class."""
+
 from __future__ import annotations
 
 import os

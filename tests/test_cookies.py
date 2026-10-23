@@ -1,4 +1,5 @@
 """Tests for pyt.cookies — load_cookies_from_file, load_cookies_from_browser, install_cookies."""
+
 import http.cookiejar
 
 import pytest
@@ -12,8 +13,8 @@ from pyt.cookies import (
     _SUPPORTED_BROWSERS,
 )
 
-
 # ── load_cookies_from_file ────────────────────────────────────────────────────
+
 
 def test_load_cookies_raises_for_missing_file():
     with pytest.raises(FileNotFoundError, match="Cookie file not found"):
@@ -42,6 +43,7 @@ def test_load_cookies_empty_file_returns_empty_jar(tmp_path):
 
 
 # ── load_cookies_from_browser ─────────────────────────────────────────────────
+
 
 def test_load_cookies_browser_unsupported_raises():
     with pytest.raises(ValueError, match="Unsupported browser"):
@@ -73,6 +75,7 @@ def test_load_cookies_browser_case_insensitive():
 
 
 # ── install_cookies ───────────────────────────────────────────────────────────
+
 
 def test_install_cookies_patches_execute_request():
     from pyt import request as pyt_request

@@ -21,6 +21,7 @@ that mimics ``urllib`` responses so tests can hand pre-built UMP
 bytes to ``UmpParser.feed()`` and ``SabrSession``'s HTTP loop without
 hitting the network.
 """
+
 from __future__ import annotations
 
 import gzip
@@ -35,7 +36,6 @@ from pyt.sabr.proto import (
     field_string,
     field_varint,
 )
-
 
 # ── UMP varint encoder (mirror of pyt.sabr.ump._ump_varint decoding) ──────
 
@@ -66,20 +66,24 @@ def encode_ump_varint(value: int) -> bytes:
 
     if value < (1 << 21):
         # 110xxxxx + 2 bytes; first holds low 5 bits, then 8 bits, then 8 bits
-        return bytes([
-            0xC0 | (value & 0x1F),
-            (value >> 5) & 0xFF,
-            (value >> 13) & 0xFF,
-        ])
+        return bytes(
+            [
+                0xC0 | (value & 0x1F),
+                (value >> 5) & 0xFF,
+                (value >> 13) & 0xFF,
+            ]
+        )
 
     if value < (1 << 28):
         # 1110xxxx + 3 bytes
-        return bytes([
-            0xE0 | (value & 0x0F),
-            (value >> 4) & 0xFF,
-            (value >> 12) & 0xFF,
-            (value >> 20) & 0xFF,
-        ])
+        return bytes(
+            [
+                0xE0 | (value & 0x0F),
+                (value >> 4) & 0xFF,
+                (value >> 12) & 0xFF,
+                (value >> 20) & 0xFF,
+            ]
+        )
 
     # 11110xxx + 4 bytes LE uint32 (low 3 bits of the leading byte are
     # ignored by the decoder).
@@ -114,16 +118,17 @@ def gzip_wrap(body: bytes) -> bytes:
 # Mirror of UMP part-type constants from pyt/sabr/ump.py. Re-defined
 # here so tests don't depend on import order (and so when YouTube adds
 # a new part type, the wire-format constants stay together).
-PT_MEDIA_HEADER              = 20
-PT_MEDIA                     = 21
-PT_MEDIA_END                 = 22
-PT_NEXT_REQUEST_POLICY       = 35
+PT_MEDIA_HEADER = 20
+PT_MEDIA = 21
+PT_MEDIA_END = 22
+PT_NEXT_REQUEST_POLICY = 35
 PT_FORMAT_INITIALIZATION_METADATA = 42
-PT_SABR_REDIRECT             = 43
-PT_SABR_ERROR                = 44
-PT_SABR_SEEK                 = 45
-PT_SABR_CONTEXT_UPDATE       = 57
-PT_STREAM_PROTECTION_STATUS  = 58
+PT_SABR_REDIRECT = 43
+PT_SABR_ERROR = 44
+PT_SABR_SEEK = 45
+PT_LIVE_METADATA = 31
+PT_SABR_CONTEXT_UPDATE = 57
+PT_STREAM_PROTECTION_STATUS = 58
 PT_SABR_CONTEXT_SENDING_POLICY = 59
 
 
@@ -278,6 +283,31 @@ def make_sabr_context_update(
     return make_ump_part(PT_SABR_CONTEXT_UPDATE, msg)
 
 
+def make_sabr_seek(
+    *,
+    seek_time_ticks: int,
+    timescale: int,
+    seek_source: Optional[int] = None,
+) -> bytes:
+    """SABR_SEEK (part 45)."""
+    msg = field_varint(1, seek_time_ticks)
+    msg += field_varint(2, timescale)
+    if seek_source is not None:
+        msg += field_varint(3, seek_source)
+    return make_ump_part(PT_SABR_SEEK, msg)
+
+
+def make_live_metadata(raw_fields: Optional[Mapping[int, int]] = None) -> bytes:
+    """LIVE_METADATA (part 31). Real field layout is unconfirmed (see
+    pyt.sabr.ump.parse_live_metadata) — this emits generic varint fields
+    keyed by field number so tests can assert on the inert-logging
+    contract without encoding semantics we haven't verified."""
+    msg = b""
+    for field_num, value in (raw_fields or {}).items():
+        msg += field_varint(field_num, value)
+    return make_ump_part(PT_LIVE_METADATA, msg)
+
+
 def make_sabr_context_sending_policy(
     *,
     start: Sequence[int] = (),
@@ -363,12 +393,15 @@ def build_segment_response(
     parts: List[bytes] = []
     if end_segment_index is not None:
         parts.append(make_format_init(itag=itag, total_segments=end_segment_index))
-    parts.append(make_media_header(
-        header_id=header_id, itag=itag,
-        sequence_number=sequence_number,
-        is_init_seg=is_init_seg,
-        content_length=len(data) if not is_init_seg else None,
-    ))
+    parts.append(
+        make_media_header(
+            header_id=header_id,
+            itag=itag,
+            sequence_number=sequence_number,
+            is_init_seg=is_init_seg,
+            content_length=len(data) if not is_init_seg else None,
+        )
+    )
     parts.append(make_media(header_id=header_id, data=data))
     parts.append(make_media_end(header_id=header_id))
     parts.extend(extra_parts)
@@ -392,11 +425,14 @@ def build_multi_format_response(
     for header_id, itag, data in formats:
         if end_segment_index is not None:
             parts.append(make_format_init(itag=itag, total_segments=end_segment_index))
-        parts.append(make_media_header(
-            header_id=header_id, itag=itag,
-            sequence_number=sequence_number,
-            content_length=len(data),
-        ))
+        parts.append(
+            make_media_header(
+                header_id=header_id,
+                itag=itag,
+                sequence_number=sequence_number,
+                content_length=len(data),
+            )
+        )
         parts.append(make_media(header_id=header_id, data=data))
         parts.append(make_media_end(header_id=header_id))
     parts.extend(extra_parts)

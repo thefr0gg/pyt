@@ -1,4 +1,5 @@
 """Lazy download builder."""
+
 from __future__ import annotations
 
 import logging
@@ -13,7 +14,6 @@ from urllib.error import HTTPError
 from pyt.api.errors import DownloadError, PostProcessError
 from pyt import request as _req
 from pyt.helpers import safe_filename, target_directory
-
 
 logger = logging.getLogger(__name__)
 
@@ -85,8 +85,13 @@ class Download:
         logger.info(
             "Download.run: starting itag=%d kind=%s subtype=%s output=%s "
             "filename=%s steps=%d (video_id=%s)",
-            self._stream.itag, self._stream.kind, self._stream.subtype,
-            self._output_path, self._filename, len(self._steps), video_id,
+            self._stream.itag,
+            self._stream.kind,
+            self._stream.subtype,
+            self._output_path,
+            self._filename,
+            len(self._steps),
+            video_id,
         )
         t_dl_start = time.monotonic()
         try:
@@ -96,7 +101,9 @@ class Download:
         except Exception as exc:
             logger.warning(
                 "Download.run: byte transfer failed for itag=%d after %.2fs: %s",
-                self._stream.itag, time.monotonic() - t_dl_start, exc,
+                self._stream.itag,
+                time.monotonic() - t_dl_start,
+                exc,
             )
             raise DownloadError(
                 f"download failed: {exc}",
@@ -105,7 +112,9 @@ class Download:
             ) from exc
         logger.info(
             "Download.run: bytes complete itag=%d in %.2fs path=%s",
-            self._stream.itag, time.monotonic() - t_dl_start, raw_path,
+            self._stream.itag,
+            time.monotonic() - t_dl_start,
+            raw_path,
         )
 
         path = raw_path
@@ -115,12 +124,16 @@ class Download:
             try:
                 path = step.apply(path, stream=self._stream, video=self._stream.video)
             except PostProcessError:
-                logger.warning("Download.run: step '%s' raised PostProcessError", step.name)
+                logger.warning(
+                    "Download.run: step '%s' raised PostProcessError", step.name
+                )
                 raise
             except Exception as exc:
                 logger.warning(
                     "Download.run: step '%s' failed after %.2fs: %s",
-                    step.name, time.monotonic() - t_step, exc,
+                    step.name,
+                    time.monotonic() - t_step,
+                    exc,
                 )
                 raise PostProcessError(
                     f"step '{step.name}' failed: {exc}",
@@ -130,7 +143,9 @@ class Download:
                 ) from exc
             logger.debug(
                 "Download.run: step '%s' done in %.2fs -> %s",
-                step.name, time.monotonic() - t_step, path,
+                step.name,
+                time.monotonic() - t_step,
+                path,
             )
 
         return Path(path)
@@ -140,7 +155,7 @@ class Download:
     def _transfer_bytes(self) -> str:
         """Write stream bytes to disk. Returns the file path string."""
         stream = self._stream
-        sabr_cfg = getattr(stream.video, '_sabr_config', None)
+        sabr_cfg = getattr(stream.video, "_sabr_config", None)
 
         # ── file path ──────────────────────────────────────────────────────
         filename = self._filename or stream.default_filename
@@ -158,7 +173,11 @@ class Download:
                 return file_path
 
         # ── transfer ───────────────────────────────────────────────────────
-        timeout = self._timeout if self._timeout is not None else socket._GLOBAL_DEFAULT_TIMEOUT
+        timeout = (
+            self._timeout
+            if self._timeout is not None
+            else socket._GLOBAL_DEFAULT_TIMEOUT
+        )
         max_retries = self._max_retries
         url = stream.url
         extra_headers = (sabr_cfg.stream_headers or {}) if sabr_cfg else {}
@@ -174,19 +193,29 @@ class Download:
                     for chunk in _req.sabr_stream(
                         sabr_url,
                         stream.itag,
-                        ustreamer_config=sabr_cfg.ustreamer_config if sabr_cfg else None,
+                        ustreamer_config=(
+                            sabr_cfg.ustreamer_config if sabr_cfg else None
+                        ),
                         po_token=sabr_cfg.po_token if sabr_cfg else None,
-                        is_video=(stream.kind == 'video'),
+                        is_video=(stream.kind == "video"),
                         filesize=known_filesize,
-                        duration_ms=int((sabr_cfg.duration or 0) * 1000) if sabr_cfg else 0,
+                        duration_ms=(
+                            int((sabr_cfg.duration or 0) * 1000) if sabr_cfg else 0
+                        ),
                         client_info=sabr_cfg.client_info if sabr_cfg else {},
-                        refresh_callback=sabr_cfg.refresh_sabr_config if sabr_cfg else None,
+                        refresh_callback=(
+                            sabr_cfg.refresh_sabr_config if sabr_cfg else None
+                        ),
                         timeout=timeout,
                     ):
                         bytes_remaining = max(0, bytes_remaining - len(chunk))
-                        self._fire_progress(sabr_cfg, stream, chunk, fh, bytes_remaining)
+                        self._fire_progress(
+                            sabr_cfg, stream, chunk, fh, bytes_remaining
+                        )
                 except Exception as exc:
-                    logger.warning("SABR failed (%s), falling back to range download", exc)
+                    logger.warning(
+                        "SABR failed (%s), falling back to range download", exc
+                    )
                     fh.seek(0)
                     fh.truncate()
                     bytes_remaining = known_filesize
@@ -201,12 +230,16 @@ class Download:
                     )
                     try:
                         for chunk in _req.stream(
-                            url, timeout=timeout, max_retries=max_retries,
+                            url,
+                            timeout=timeout,
+                            max_retries=max_retries,
                             start_byte=sabr_offset,
                             extra_headers=extra_headers or None,
                         ):
                             bytes_remaining -= len(chunk)
-                            self._fire_progress(sabr_cfg, stream, chunk, fh, bytes_remaining)
+                            self._fire_progress(
+                                sabr_cfg, stream, chunk, fh, bytes_remaining
+                            )
                         self._fire_complete(sabr_cfg, stream, file_path)
                         return file_path
                     except HTTPError as e:
@@ -220,7 +253,9 @@ class Download:
             used_seq = False
             try:
                 for chunk in _req.stream(
-                    url, timeout=timeout, max_retries=max_retries,
+                    url,
+                    timeout=timeout,
+                    max_retries=max_retries,
                     extra_headers=extra_headers or None,
                 ):
                     bytes_remaining -= len(chunk)
@@ -232,7 +267,9 @@ class Download:
                 fh.truncate()
                 bytes_remaining = known_filesize
                 used_seq = True
-                for chunk in _req.seq_stream(url, timeout=timeout, max_retries=max_retries):
+                for chunk in _req.seq_stream(
+                    url, timeout=timeout, max_retries=max_retries
+                ):
                     bytes_remaining -= len(chunk)
                     self._fire_progress(sabr_cfg, stream, chunk, fh, bytes_remaining)
 
@@ -257,7 +294,9 @@ class Download:
         return file_path
 
     @staticmethod
-    def _fire_progress(sabr_cfg, stream, chunk: bytes, fh, bytes_remaining: int) -> None:
+    def _fire_progress(
+        sabr_cfg, stream, chunk: bytes, fh, bytes_remaining: int
+    ) -> None:
         fh.write(chunk)
         if sabr_cfg and sabr_cfg.on_progress:
             sabr_cfg.on_progress(stream, chunk, bytes_remaining)

@@ -1,32 +1,19 @@
 """Module to download a complete playlist from a youtube channel."""
+
 import json
 import logging
 import warnings
 
 from collections.abc import Sequence
-from datetime import (
-    date,
-    datetime
-)
-from typing import (
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Tuple,
-    Union
-)
+from datetime import date, datetime
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 from pyt import extract, request
 from pyt.__main__ import YouTube
-from pyt.helpers import (
-    cache,
-    DeferredGeneratorList,
-    install_proxy,
-    uniqueify
-)
+from pyt.helpers import cache, DeferredGeneratorList, install_proxy, uniqueify
 
 logger = logging.getLogger(__name__)
+
 
 class Playlist(Sequence):
     """Load a YouTube playlist with URL.
@@ -116,8 +103,9 @@ class Playlist(Sequence):
         if self._sidebar_info:
             return self._sidebar_info
         else:
-            self._sidebar_info = self.initial_data['sidebar'][
-                'playlistSidebarRenderer']['items']
+            self._sidebar_info = self.initial_data["sidebar"][
+                "playlistSidebarRenderer"
+            ]["items"]
             return self._sidebar_info
 
     @property
@@ -126,11 +114,9 @@ class Playlist(Sequence):
 
         :rtype: str
         """
-        return self.ytcfg['INNERTUBE_API_KEY']
+        return self.ytcfg["INNERTUBE_API_KEY"]
 
-    def _paginate(
-        self, until_watch_id: Optional[str] = None
-    ) -> Iterable[List[str]]:
+    def _paginate(self, until_watch_id: Optional[str] = None) -> Iterable[List[str]]:
         """Parse the video links from the page source, yields the /watch?v=
         part from video link
 
@@ -210,12 +196,9 @@ class Playlist(Sequence):
             {
                 "continuation": continuation,
                 "context": {
-                    "client": {
-                        "clientName": "WEB",
-                        "clientVersion": "2.20200720.00.02"
-                    }
-                }
-            }
+                    "client": {"clientName": "WEB", "clientVersion": "2.20200720.00.02"}
+                },
+            },
         )
 
     @staticmethod
@@ -233,36 +216,36 @@ class Playlist(Sequence):
             # this is the json tree structure, if the json was extracted from
             # html
             section_contents = initial_data["contents"][
-                "twoColumnBrowseResultsRenderer"][
-                "tabs"][0]["tabRenderer"]["content"][
-                "sectionListRenderer"]["contents"]
+                "twoColumnBrowseResultsRenderer"
+            ]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"]["contents"]
             try:
                 # Playlist without submenus
-                important_content = section_contents[
-                    0]["itemSectionRenderer"][
-                    "contents"][0]["playlistVideoListRenderer"]
+                important_content = section_contents[0]["itemSectionRenderer"][
+                    "contents"
+                ][0]["playlistVideoListRenderer"]
             except (KeyError, IndexError, TypeError):
                 # Playlist with submenus
-                important_content = section_contents[
-                    1]["itemSectionRenderer"][
-                    "contents"][0]["playlistVideoListRenderer"]
+                important_content = section_contents[1]["itemSectionRenderer"][
+                    "contents"
+                ][0]["playlistVideoListRenderer"]
             videos = important_content["contents"]
         except (KeyError, IndexError, TypeError):
             try:
                 # this is the json tree structure, if the json was directly sent
                 # by the server in a continuation response
                 # no longer a list and no longer has the "response" key
-                important_content = initial_data['onResponseReceivedActions'][0][
-                    'appendContinuationItemsAction']['continuationItems']
+                important_content = initial_data["onResponseReceivedActions"][0][
+                    "appendContinuationItemsAction"
+                ]["continuationItems"]
                 videos = important_content
             except (KeyError, IndexError, TypeError) as p:
                 logger.info(p)
                 return [], None
 
         try:
-            continuation = videos[-1]['continuationItemRenderer'][
-                'continuationEndpoint'
-            ]['continuationCommand']['token']
+            continuation = videos[-1]["continuationItemRenderer"][
+                "continuationEndpoint"
+            ]["continuationCommand"]["token"]
             videos = videos[:-1]
         except (KeyError, IndexError):
             # if there is an error, no continuation is available
@@ -275,10 +258,9 @@ class Playlist(Sequence):
                     # only extract the video ids from the video data
                     map(
                         lambda x: (
-                            f"/watch?v="
-                            f"{x['playlistVideoRenderer']['videoId']}"
+                            f"/watch?v=" f"{x['playlistVideoRenderer']['videoId']}"
                         ),
-                        videos
+                        videos,
                     )
                 ),
             ),
@@ -355,16 +337,15 @@ class Playlist(Sequence):
         :return: Date of last playlist update where possible, else the string provided
         :rtype: datetime.date
         """
-        last_updated_text = self.sidebar_info[0]['playlistSidebarPrimaryInfoRenderer'][
-            'stats'][2]['runs'][1]['text']
+        last_updated_text = self.sidebar_info[0]["playlistSidebarPrimaryInfoRenderer"][
+            "stats"
+        ][2]["runs"][1]["text"]
         try:
             date_components = last_updated_text.split()
             month = date_components[0]
-            day = date_components[1].strip(',')
+            day = date_components[1].strip(",")
             year = date_components[2]
-            return datetime.strptime(
-                f"{month} {day:0>2} {year}", "%b %d %Y"
-            ).date()
+            return datetime.strptime(f"{month} {day:0>2} {year}", "%b %d %Y").date()
         except (IndexError, KeyError):
             return last_updated_text
 
@@ -376,13 +357,15 @@ class Playlist(Sequence):
         :return: playlist title (name)
         :rtype: Optional[str]
         """
-        return self.sidebar_info[0]['playlistSidebarPrimaryInfoRenderer'][
-            'title']['runs'][0]['text']
+        return self.sidebar_info[0]["playlistSidebarPrimaryInfoRenderer"]["title"][
+            "runs"
+        ][0]["text"]
 
     @property
     def description(self) -> str:
-        return self.sidebar_info[0]['playlistSidebarPrimaryInfoRenderer'][
-            'description']['simpleText']
+        return self.sidebar_info[0]["playlistSidebarPrimaryInfoRenderer"][
+            "description"
+        ]["simpleText"]
 
     @property
     def length(self):
@@ -391,9 +374,10 @@ class Playlist(Sequence):
         :return: Playlist video count
         :rtype: int
         """
-        count_text = self.sidebar_info[0]['playlistSidebarPrimaryInfoRenderer'][
-            'stats'][0]['runs'][0]['text']
-        count_text = count_text.replace(',','')
+        count_text = self.sidebar_info[0]["playlistSidebarPrimaryInfoRenderer"][
+            "stats"
+        ][0]["runs"][0]["text"]
+        count_text = count_text.replace(",", "")
         return int(count_text)
 
     @property
@@ -404,12 +388,13 @@ class Playlist(Sequence):
         :rtype: int
         """
         # "1,234,567 views"
-        views_text = self.sidebar_info[0]['playlistSidebarPrimaryInfoRenderer'][
-            'stats'][1]['simpleText']
+        views_text = self.sidebar_info[0]["playlistSidebarPrimaryInfoRenderer"][
+            "stats"
+        ][1]["simpleText"]
         # "1,234,567"
         count_text = views_text.split()[0]
         # "1234567"
-        count_text = count_text.replace(',', '')
+        count_text = count_text.replace(",", "")
         return int(count_text)
 
     @property
@@ -419,8 +404,9 @@ class Playlist(Sequence):
         :return: Playlist owner name.
         :rtype: str
         """
-        return self.sidebar_info[1]['playlistSidebarSecondaryInfoRenderer'][
-            'videoOwner']['videoOwnerRenderer']['title']['runs'][0]['text']
+        return self.sidebar_info[1]["playlistSidebarSecondaryInfoRenderer"][
+            "videoOwner"
+        ]["videoOwnerRenderer"]["title"]["runs"][0]["text"]
 
     @property
     def owner_id(self):
@@ -429,9 +415,13 @@ class Playlist(Sequence):
         :return: Playlist owner's channel ID.
         :rtype: str
         """
-        return self.sidebar_info[1]['playlistSidebarSecondaryInfoRenderer'][
-            'videoOwner']['videoOwnerRenderer']['title']['runs'][0][
-            'navigationEndpoint']['browseEndpoint']['browseId']
+        return self.sidebar_info[1]["playlistSidebarSecondaryInfoRenderer"][
+            "videoOwner"
+        ]["videoOwnerRenderer"]["title"]["runs"][0]["navigationEndpoint"][
+            "browseEndpoint"
+        ][
+            "browseId"
+        ]
 
     @property
     def owner_url(self):
@@ -440,7 +430,7 @@ class Playlist(Sequence):
         :return: Playlist owner's channel url.
         :rtype: str
         """
-        return f'https://www.youtube.com/channel/{self.owner_id}'
+        return f"https://www.youtube.com/channel/{self.owner_id}"
 
     @staticmethod
     def _video_url(watch_path: str):

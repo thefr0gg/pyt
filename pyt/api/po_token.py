@@ -31,6 +31,7 @@ holds as an attribute and asks for a fresh token whenever
 doesn't run on every request — only on the first attempt and then
 again after attestation failures.
 """
+
 from __future__ import annotations
 
 import logging
@@ -43,7 +44,6 @@ from typing import Callable, List, Optional, Sequence, Union
 
 from pyt.api._jsruntime import detect_runtime, run_script
 from pyt.api.errors import ConfigError
-
 
 logger = logging.getLogger(__name__)
 
@@ -84,19 +84,23 @@ class PoTokenProvider:
     def get(self, *, force_refresh: bool = False) -> str:
         """Return a valid token, refreshing if expired or requested."""
         if not force_refresh and self._cache and not self._cache.is_expired(self._ttl):
-            logger.debug("po_token[%s]: returning cached token (age %.1fs)",
-                         self.name, time.monotonic() - self._cache.issued_at)
+            logger.debug(
+                "po_token[%s]: returning cached token (age %.1fs)",
+                self.name,
+                time.monotonic() - self._cache.issued_at,
+            )
             return self._cache.value
 
-        logger.info("po_token[%s]: generating new token (force_refresh=%s)",
-                    self.name, force_refresh)
+        logger.info(
+            "po_token[%s]: generating new token (force_refresh=%s)",
+            self.name,
+            force_refresh,
+        )
         t0 = time.monotonic()
         try:
             token = self._generate()
         except Exception as exc:
-            raise ConfigError(
-                f"po_token provider '{self.name}' failed: {exc}"
-            ) from exc
+            raise ConfigError(f"po_token provider '{self.name}' failed: {exc}") from exc
 
         if not isinstance(token, str) or not token.strip():
             raise ConfigError(
@@ -107,7 +111,9 @@ class PoTokenProvider:
         elapsed = time.monotonic() - t0
         logger.info(
             "po_token[%s]: got %d-char token in %.2fs",
-            self.name, len(token), elapsed,
+            self.name,
+            len(token),
+            elapsed,
         )
         self._cache = _CachedToken(value=token)
         return token
@@ -163,7 +169,9 @@ class CallableProvider(PoTokenProvider):
 
     name = "callable"
 
-    def __init__(self, fn: Callable[[], str], *, ttl_seconds: float = _DEFAULT_TTL_SECONDS):
+    def __init__(
+        self, fn: Callable[[], str], *, ttl_seconds: float = _DEFAULT_TTL_SECONDS
+    ):
         if not callable(fn):
             raise ConfigError("po_token_provider must be callable")
         super().__init__(ttl_seconds=ttl_seconds)
@@ -251,7 +259,10 @@ class ScriptProvider(PoTokenProvider):
                 "deno (https://deno.com). Or run: pyt --doctor"
             )
         text = run_script(
-            runtime, self._script, self._args, timeout=self._timeout,
+            runtime,
+            self._script,
+            self._args,
+            timeout=self._timeout,
         )
         for line in reversed(text.splitlines()):
             line = line.strip()

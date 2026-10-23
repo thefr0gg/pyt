@@ -1,4 +1,5 @@
 """Tests for the public logging-control API (pyt.api._logging)."""
+
 from __future__ import annotations
 
 import io
@@ -41,11 +42,17 @@ def test_enable_logging_adds_stderr_handler():
 
 def test_enable_logging_idempotent_replaces_handler():
     _logging.enable_logging("DEBUG")
-    first_handlers = [h for h in logging.getLogger("pyt").handlers
-                      if getattr(h, "_pyt_managed", False)]
+    first_handlers = [
+        h
+        for h in logging.getLogger("pyt").handlers
+        if getattr(h, "_pyt_managed", False)
+    ]
     _logging.enable_logging("INFO")
-    second_handlers = [h for h in logging.getLogger("pyt").handlers
-                       if getattr(h, "_pyt_managed", False)]
+    second_handlers = [
+        h
+        for h in logging.getLogger("pyt").handlers
+        if getattr(h, "_pyt_managed", False)
+    ]
     assert len(second_handlers) == len(first_handlers)
     # Old stderr handler is gone, new one took its place.
     assert second_handlers[0] is not first_handlers[0]
@@ -59,8 +66,11 @@ def test_disable_logging_removes_managed_handlers_only():
     # User's handler is still there.
     assert user_handler in logging.getLogger("pyt").handlers
     # Our managed handler is gone.
-    managed = [h for h in logging.getLogger("pyt").handlers
-               if getattr(h, "_pyt_managed", False)]
+    managed = [
+        h
+        for h in logging.getLogger("pyt").handlers
+        if getattr(h, "_pyt_managed", False)
+    ]
     assert managed == []
     assert not _logging.is_enabled()
 
@@ -133,7 +143,9 @@ def test_enable_logging_writes_to_file(tmp_path):
 def test_enable_logging_custom_format():
     buf = io.StringIO()
     _logging.enable_logging(
-        "DEBUG", stream=buf, fmt="<<%(levelname)s>> %(message)s",
+        "DEBUG",
+        stream=buf,
+        fmt="<<%(levelname)s>> %(message)s",
     )
     logging.getLogger("pyt.test").info("custom-fmt-msg")
     text = buf.getvalue()
@@ -195,8 +207,12 @@ def test_root_module_exposes_logging_api():
     # `is` checks on the rebound symbols, but `pyt.enable_logging` is
     # still the function we care about.
     for attr in (
-        "enable_logging", "disable_logging", "set_log_level",
-        "get_log_level", "logging_enabled", "diagnostic_report",
+        "enable_logging",
+        "disable_logging",
+        "set_log_level",
+        "get_log_level",
+        "logging_enabled",
+        "diagnostic_report",
     ):
         assert callable(getattr(pyt, attr)), f"pyt.{attr} should be callable"
     assert isinstance(pyt.TRACE, int)
@@ -208,6 +224,7 @@ def test_root_module_exposes_logging_api():
 def test_diagnostic_report_includes_pyt_version():
     report = _logging.diagnostic_report()
     from pyt.version import __version__
+
     assert __version__ in report
 
 
@@ -229,7 +246,7 @@ def test_diagnostic_report_no_user_data_leaks():
     user content. We only check for the absence of obvious leaks."""
     report = _logging.diagnostic_report()
     assert "https://" not in report  # no URLs
-    assert "youtu" not in report     # no video URLs
+    assert "youtu" not in report  # no video URLs
 
 
 # ── module integration: emits land in caplog ──────────────────────────────
@@ -237,11 +254,10 @@ def test_diagnostic_report_no_user_data_leaks():
 
 def test_client_init_emits_debug_log(caplog):
     from pyt import Client
+
     with caplog.at_level(logging.DEBUG, logger="pyt.api.client"):
         Client()
-    assert any(
-        "Client init" in r.getMessage() for r in caplog.records
-    )
+    assert any("Client init" in r.getMessage() for r in caplog.records)
 
 
 def test_client_video_emits_info_log(caplog):

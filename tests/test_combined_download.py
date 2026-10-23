@@ -1,4 +1,5 @@
 """Tests for the multi-format SABR orchestrator (pyt.api.combined)."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,20 +16,22 @@ from pyt.api._merge import (
 )
 from pyt.api.video import Video, _hydrate_meta
 
-
 # ── pick_merge_container ───────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("video_codec,audio_codec,expected", [
-    ("avc1.640028", "mp4a.40.2", "mp4"),
-    ("av01.0.08M.08", "mp4a.40.2", "mp4"),
-    ("vp9", "opus", "webm"),
-    ("vp09.00.50.08", "opus", "webm"),
-    ("avc1.640028", "opus", "mkv"),       # cross-family
-    ("vp9", "mp4a.40.2", "mkv"),          # cross-family
-    (None, "mp4a.40.2", "mkv"),           # missing codec info
-    ("avc1.640028", None, "mkv"),
-])
+@pytest.mark.parametrize(
+    "video_codec,audio_codec,expected",
+    [
+        ("avc1.640028", "mp4a.40.2", "mp4"),
+        ("av01.0.08M.08", "mp4a.40.2", "mp4"),
+        ("vp9", "opus", "webm"),
+        ("vp09.00.50.08", "opus", "webm"),
+        ("avc1.640028", "opus", "mkv"),  # cross-family
+        ("vp9", "mp4a.40.2", "mkv"),  # cross-family
+        (None, "mp4a.40.2", "mkv"),  # missing codec info
+        ("avc1.640028", None, "mkv"),
+    ],
+)
 def test_pick_merge_container(video_codec, audio_codec, expected):
     assert pick_merge_container(video_codec, audio_codec) == expected
 
@@ -59,9 +62,11 @@ def test_run_ffmpeg_merge_passes_discardcorrupt_flag(tmp_path):
     for p in (video_in, audio_in):
         p.write_bytes(b"x")
 
-    with mock.patch("pyt.api._merge.shutil.which", return_value="/usr/bin/ffmpeg"), \
-         mock.patch("pyt.api._merge.subprocess.run", side_effect=fake_run), \
-         mock.patch("pyt.api._merge.probe_duration", return_value=None):
+    with mock.patch(
+        "pyt.api._merge.shutil.which", return_value="/usr/bin/ffmpeg"
+    ), mock.patch("pyt.api._merge.subprocess.run", side_effect=fake_run), mock.patch(
+        "pyt.api._merge.probe_duration", return_value=None
+    ):
         # probe_duration returns None for both inputs and output → validation
         # is a no-op, so we can test just the argv shape here.
         run_ffmpeg_merge(video_in, audio_in, output)
@@ -99,9 +104,11 @@ def test_run_ffmpeg_merge_validates_output_duration(tmp_path):
     def fake_probe(path):
         return duration_for.get(str(path))
 
-    with mock.patch("pyt.api._merge.shutil.which", return_value="/usr/bin/ffmpeg"), \
-         mock.patch("pyt.api._merge.subprocess.run", side_effect=fake_run), \
-         mock.patch("pyt.api._merge.probe_duration", side_effect=fake_probe):
+    with mock.patch(
+        "pyt.api._merge.shutil.which", return_value="/usr/bin/ffmpeg"
+    ), mock.patch("pyt.api._merge.subprocess.run", side_effect=fake_run), mock.patch(
+        "pyt.api._merge.probe_duration", side_effect=fake_probe
+    ):
         with pytest.raises(FFmpegMergeError) as exc_info:
             run_ffmpeg_merge(video_in, audio_in, output)
 
@@ -136,9 +143,11 @@ def test_run_ffmpeg_merge_accepts_normal_output(tmp_path):
     def fake_probe(path):
         return duration_for.get(str(path))
 
-    with mock.patch("pyt.api._merge.shutil.which", return_value="/usr/bin/ffmpeg"), \
-         mock.patch("pyt.api._merge.subprocess.run", side_effect=fake_run), \
-         mock.patch("pyt.api._merge.probe_duration", side_effect=fake_probe):
+    with mock.patch(
+        "pyt.api._merge.shutil.which", return_value="/usr/bin/ffmpeg"
+    ), mock.patch("pyt.api._merge.subprocess.run", side_effect=fake_run), mock.patch(
+        "pyt.api._merge.probe_duration", side_effect=fake_probe
+    ):
         result = run_ffmpeg_merge(video_in, audio_in, output)
 
     assert result == output
@@ -159,9 +168,11 @@ def test_run_ffmpeg_merge_skips_validation_without_ffprobe(tmp_path):
         Path(cmd[-1]).write_bytes(b"y")
         return mock.Mock(returncode=0, stderr=b"")
 
-    with mock.patch("pyt.api._merge.shutil.which", return_value="/usr/bin/ffmpeg"), \
-         mock.patch("pyt.api._merge.subprocess.run", side_effect=fake_run), \
-         mock.patch("pyt.api._merge.probe_duration", return_value=None):
+    with mock.patch(
+        "pyt.api._merge.shutil.which", return_value="/usr/bin/ffmpeg"
+    ), mock.patch("pyt.api._merge.subprocess.run", side_effect=fake_run), mock.patch(
+        "pyt.api._merge.probe_duration", return_value=None
+    ):
         result = run_ffmpeg_merge(video_in, audio_in, output)
 
     assert result == output
@@ -170,11 +181,12 @@ def test_run_ffmpeg_merge_skips_validation_without_ffprobe(tmp_path):
 def test_probe_duration_parses_format_duration(tmp_path):
     from pyt.api._merge import probe_duration
 
-    with mock.patch("pyt.api._merge.shutil.which", return_value="/usr/bin/ffprobe"), \
-         mock.patch(
-             "pyt.api._merge.subprocess.run",
-             return_value=mock.Mock(stdout=b"127.456\n"),
-         ):
+    with mock.patch(
+        "pyt.api._merge.shutil.which", return_value="/usr/bin/ffprobe"
+    ), mock.patch(
+        "pyt.api._merge.subprocess.run",
+        return_value=mock.Mock(stdout=b"127.456\n"),
+    ):
         assert probe_duration(tmp_path / "v.mp4") == pytest.approx(127.456)
 
 
@@ -194,24 +206,70 @@ def _make_video(cipher_signature):
     from pyt.api._sabr_config import _SabrConfig
 
     pr = cipher_signature._vid_info
-    meta = _hydrate_meta(pr, url=f"https://youtube.com/watch?v={cipher_signature.video_id}")
-    video = Video(player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={})
+    meta = _hydrate_meta(
+        pr, url=f"https://youtube.com/watch?v={cipher_signature.video_id}"
+    )
+    video = Video(
+        player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={}
+    )
     raw = [
-        _RawStream(itag=18, url="https://ex.com/18", mime_type="video/mp4",
-                   kind="video", subtype="mp4", video_codec="avc1", audio_codec="mp4a",
-                   is_adaptive=False, is_progressive=True, is_otf=False,
-                   bitrate=500000, filesize=5000000, filesize_approx=5000000,
-                   resolution="360p", fps=30, abr=None, default_filename="v.mp4"),
-        _RawStream(itag=136, url="https://ex.com/136", mime_type="video/mp4",
-                   kind="video", subtype="mp4", video_codec="avc1", audio_codec=None,
-                   is_adaptive=True, is_progressive=False, is_otf=False,
-                   bitrate=1500000, filesize=15000000, filesize_approx=15000000,
-                   resolution="720p", fps=30, abr=None, default_filename="v.mp4"),
-        _RawStream(itag=140, url="https://ex.com/140", mime_type="audio/mp4",
-                   kind="audio", subtype="mp4", video_codec=None, audio_codec="mp4a",
-                   is_adaptive=True, is_progressive=False, is_otf=False,
-                   bitrate=128000, filesize=3000000, filesize_approx=3000000,
-                   resolution=None, fps=None, abr="128kbps", default_filename="a.mp4"),
+        _RawStream(
+            itag=18,
+            url="https://ex.com/18",
+            mime_type="video/mp4",
+            kind="video",
+            subtype="mp4",
+            video_codec="avc1",
+            audio_codec="mp4a",
+            is_adaptive=False,
+            is_progressive=True,
+            is_otf=False,
+            bitrate=500000,
+            filesize=5000000,
+            filesize_approx=5000000,
+            resolution="360p",
+            fps=30,
+            abr=None,
+            default_filename="v.mp4",
+        ),
+        _RawStream(
+            itag=136,
+            url="https://ex.com/136",
+            mime_type="video/mp4",
+            kind="video",
+            subtype="mp4",
+            video_codec="avc1",
+            audio_codec=None,
+            is_adaptive=True,
+            is_progressive=False,
+            is_otf=False,
+            bitrate=1500000,
+            filesize=15000000,
+            filesize_approx=15000000,
+            resolution="720p",
+            fps=30,
+            abr=None,
+            default_filename="v.mp4",
+        ),
+        _RawStream(
+            itag=140,
+            url="https://ex.com/140",
+            mime_type="audio/mp4",
+            kind="audio",
+            subtype="mp4",
+            video_codec=None,
+            audio_codec="mp4a",
+            is_adaptive=True,
+            is_progressive=False,
+            is_otf=False,
+            bitrate=128000,
+            filesize=3000000,
+            filesize_approx=3000000,
+            resolution=None,
+            fps=None,
+            abr="128kbps",
+            default_filename="a.mp4",
+        ),
     ]
     video._streams = StreamSet._from_raw(raw, video=video)
     video._sabr_config = _SabrConfig()
@@ -265,7 +323,7 @@ def test_combined_download_validates_video_kind(cipher_signature):
     with pytest.raises(ValueError, match="kind='video'"):
         CombinedDownload(
             video=video,
-            video_stream=audio,         # wrong kind
+            video_stream=audio,  # wrong kind
             audio_stream=other_audio,
         )
 
@@ -279,7 +337,7 @@ def test_combined_download_validates_audio_kind(cipher_signature):
         CombinedDownload(
             video=video,
             video_stream=v_stream,
-            audio_stream=v_stream,        # wrong kind
+            audio_stream=v_stream,  # wrong kind
         )
 
 
@@ -292,7 +350,7 @@ def test_combined_download_rejects_progressive(cipher_signature):
     with pytest.raises(ValueError, match="progressive"):
         CombinedDownload(
             video=video,
-            video_stream=progressive,    # progressive video, not allowed
+            video_stream=progressive,  # progressive video, not allowed
             audio_stream=audio,
         )
 
@@ -307,21 +365,51 @@ def _build_combined(cipher_signature, target_dir, *, video_size=64, audio_size=3
     from pyt.api._sabr_config import _SabrConfig
 
     pr = cipher_signature._vid_info
-    meta = _hydrate_meta(pr, url=f"https://youtube.com/watch?v={cipher_signature.video_id}")
-    video = Video(player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={})
+    meta = _hydrate_meta(
+        pr, url=f"https://youtube.com/watch?v={cipher_signature.video_id}"
+    )
+    video = Video(
+        player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={}
+    )
 
-    v_raw = _RawStream(itag=136, url="https://ex.com/video", mime_type="video/mp4",
-                       kind="video", subtype="mp4", video_codec="avc1.4d401f",
-                       audio_codec=None, is_adaptive=True, is_progressive=False,
-                       is_otf=False, bitrate=1500000,
-                       filesize=video_size, filesize_approx=video_size,
-                       resolution="720p", fps=30, abr=None, default_filename="v.mp4")
-    a_raw = _RawStream(itag=140, url="https://ex.com/audio", mime_type="audio/mp4",
-                       kind="audio", subtype="mp4", video_codec=None,
-                       audio_codec="mp4a.40.2", is_adaptive=True, is_progressive=False,
-                       is_otf=False, bitrate=128000,
-                       filesize=audio_size, filesize_approx=audio_size,
-                       resolution=None, fps=None, abr="128kbps", default_filename="a.mp4")
+    v_raw = _RawStream(
+        itag=136,
+        url="https://ex.com/video",
+        mime_type="video/mp4",
+        kind="video",
+        subtype="mp4",
+        video_codec="avc1.4d401f",
+        audio_codec=None,
+        is_adaptive=True,
+        is_progressive=False,
+        is_otf=False,
+        bitrate=1500000,
+        filesize=video_size,
+        filesize_approx=video_size,
+        resolution="720p",
+        fps=30,
+        abr=None,
+        default_filename="v.mp4",
+    )
+    a_raw = _RawStream(
+        itag=140,
+        url="https://ex.com/audio",
+        mime_type="audio/mp4",
+        kind="audio",
+        subtype="mp4",
+        video_codec=None,
+        audio_codec="mp4a.40.2",
+        is_adaptive=True,
+        is_progressive=False,
+        is_otf=False,
+        bitrate=128000,
+        filesize=audio_size,
+        filesize_approx=audio_size,
+        resolution=None,
+        fps=None,
+        abr="128kbps",
+        default_filename="a.mp4",
+    )
     video._streams = StreamSet._from_raw([v_raw, a_raw], video=video)
     video._sabr_config = _SabrConfig()
 
@@ -349,10 +437,12 @@ def test_run_drives_sabr_and_invokes_ffmpeg(cipher_signature, tmp_path):
     video._sabr_config.po_token = None
 
     fake_session = mock.MagicMock()
-    fake_session.iter_chunks.return_value = iter([
-        (v_stream.itag, b"V" * 10),
-        (a_stream.itag, b"A" * 6),
-    ])
+    fake_session.iter_chunks.return_value = iter(
+        [
+            (v_stream.itag, b"V" * 10),
+            (a_stream.itag, b"A" * 6),
+        ]
+    )
 
     merge_called = {}
 
@@ -364,8 +454,11 @@ def test_run_drives_sabr_and_invokes_ffmpeg(cipher_signature, tmp_path):
         Path(output_path).write_bytes(b"merged")
         return Path(output_path)
 
-    with mock.patch("pyt.api.combined.SabrSession", return_value=fake_session) as session_cls, \
-         mock.patch("pyt.api.combined.run_ffmpeg_merge", side_effect=fake_merge):
+    with mock.patch(
+        "pyt.api.combined.SabrSession", return_value=fake_session
+    ) as session_cls, mock.patch(
+        "pyt.api.combined.run_ffmpeg_merge", side_effect=fake_merge
+    ):
         result = plan.run()
 
     # SabrSession was constructed with both formats.
@@ -393,9 +486,11 @@ def test_run_falls_back_to_range_when_sabr_short(cipher_signature, tmp_path):
 
     # SABR delivers only 4 video bytes and nothing for audio, then ends.
     fake_session = mock.MagicMock()
-    fake_session.iter_chunks.return_value = iter([
-        (v_stream.itag, b"V" * 4),
-    ])
+    fake_session.iter_chunks.return_value = iter(
+        [
+            (v_stream.itag, b"V" * 4),
+        ]
+    )
 
     # Range-stream returns the missing tails.
     def fake_stream(url, *, timeout, max_retries, start_byte, extra_headers):
@@ -416,9 +511,13 @@ def test_run_falls_back_to_range_when_sabr_short(cipher_signature, tmp_path):
         Path(output_path).write_bytes(b"x")
         return Path(output_path)
 
-    with mock.patch("pyt.api.combined.SabrSession", return_value=fake_session), \
-         mock.patch("pyt.api.combined.request.stream", side_effect=fake_stream), \
-         mock.patch("pyt.api.combined.run_ffmpeg_merge", side_effect=fake_merge):
+    with mock.patch(
+        "pyt.api.combined.SabrSession", return_value=fake_session
+    ), mock.patch(
+        "pyt.api.combined.request.stream", side_effect=fake_stream
+    ), mock.patch(
+        "pyt.api.combined.run_ffmpeg_merge", side_effect=fake_merge
+    ):
         plan.run()
 
     assert captured["video"] == b"V" * 10
@@ -450,9 +549,9 @@ def test_run_uses_range_only_when_no_sabr_url(cipher_signature, tmp_path):
         Path(output_path).write_bytes(b"x")
         return Path(output_path)
 
-    with mock.patch("pyt.api.combined.SabrSession") as session_cls, \
-         mock.patch("pyt.api.combined.request.stream", side_effect=fake_stream), \
-         mock.patch("pyt.api.combined.run_ffmpeg_merge", side_effect=fake_merge):
+    with mock.patch("pyt.api.combined.SabrSession") as session_cls, mock.patch(
+        "pyt.api.combined.request.stream", side_effect=fake_stream
+    ), mock.patch("pyt.api.combined.run_ffmpeg_merge", side_effect=fake_merge):
         plan.run()
 
     # SabrSession was never constructed.
@@ -468,10 +567,12 @@ def test_run_then_chains_pipeline_steps(cipher_signature, tmp_path):
     video._sabr_config.sabr_url = "https://sabr.example/play"
 
     fake_session = mock.MagicMock()
-    fake_session.iter_chunks.return_value = iter([
-        (v_stream.itag, b"VV"),
-        (a_stream.itag, b"AA"),
-    ])
+    fake_session.iter_chunks.return_value = iter(
+        [
+            (v_stream.itag, b"VV"),
+            (a_stream.itag, b"AA"),
+        ]
+    )
 
     from pyt.api.pipeline import PipelineStep
 
@@ -489,8 +590,9 @@ def test_run_then_chains_pipeline_steps(cipher_signature, tmp_path):
         Path(output_path).write_bytes(b"x")
         return Path(output_path)
 
-    with mock.patch("pyt.api.combined.SabrSession", return_value=fake_session), \
-         mock.patch("pyt.api.combined.run_ffmpeg_merge", side_effect=fake_merge):
+    with mock.patch(
+        "pyt.api.combined.SabrSession", return_value=fake_session
+    ), mock.patch("pyt.api.combined.run_ffmpeg_merge", side_effect=fake_merge):
         result = chained.run()
 
     assert [name for name, _ in seen] == ["one", "two", "three"]
@@ -506,16 +608,19 @@ def test_run_ffmpeg_failure_raises_download_error(cipher_signature, tmp_path):
     video._sabr_config.sabr_url = "https://sabr.example/play"
 
     fake_session = mock.MagicMock()
-    fake_session.iter_chunks.return_value = iter([
-        (v_stream.itag, b"VV"),
-        (a_stream.itag, b"AA"),
-    ])
+    fake_session.iter_chunks.return_value = iter(
+        [
+            (v_stream.itag, b"VV"),
+            (a_stream.itag, b"AA"),
+        ]
+    )
 
-    with mock.patch("pyt.api.combined.SabrSession", return_value=fake_session), \
-         mock.patch(
-             "pyt.api.combined.run_ffmpeg_merge",
-             side_effect=FFmpegMergeError(1, "boom"),
-         ):
+    with mock.patch(
+        "pyt.api.combined.SabrSession", return_value=fake_session
+    ), mock.patch(
+        "pyt.api.combined.run_ffmpeg_merge",
+        side_effect=FFmpegMergeError(1, "boom"),
+    ):
         with pytest.raises(DownloadError, match="ffmpeg merge failed"):
             plan.run()
 
@@ -533,16 +638,19 @@ def test_run_ffmpeg_missing_raises_download_error(cipher_signature, tmp_path):
     video._sabr_config.sabr_url = "https://sabr.example/play"
 
     fake_session = mock.MagicMock()
-    fake_session.iter_chunks.return_value = iter([
-        (v_stream.itag, b"VV"),
-        (a_stream.itag, b"AA"),
-    ])
+    fake_session.iter_chunks.return_value = iter(
+        [
+            (v_stream.itag, b"VV"),
+            (a_stream.itag, b"AA"),
+        ]
+    )
 
-    with mock.patch("pyt.api.combined.SabrSession", return_value=fake_session), \
-         mock.patch(
-             "pyt.api.combined.run_ffmpeg_merge",
-             side_effect=FFmpegNotFound("not on PATH"),
-         ):
+    with mock.patch(
+        "pyt.api.combined.SabrSession", return_value=fake_session
+    ), mock.patch(
+        "pyt.api.combined.run_ffmpeg_merge",
+        side_effect=FFmpegNotFound("not on PATH"),
+    ):
         with pytest.raises(DownloadError, match="not on PATH"):
             plan.run()
 
@@ -561,17 +669,20 @@ def test_progress_callback_invoked_for_both_formats(cipher_signature, tmp_path):
     )
 
     fake_session = mock.MagicMock()
-    fake_session.iter_chunks.return_value = iter([
-        (v_stream.itag, b"VVVVV"),
-        (a_stream.itag, b"AAAA"),
-    ])
+    fake_session.iter_chunks.return_value = iter(
+        [
+            (v_stream.itag, b"VVVVV"),
+            (a_stream.itag, b"AAAA"),
+        ]
+    )
 
     def fake_merge(video_path, audio_path, output_path, *, container):
         Path(output_path).write_bytes(b"x")
         return Path(output_path)
 
-    with mock.patch("pyt.api.combined.SabrSession", return_value=fake_session), \
-         mock.patch("pyt.api.combined.run_ffmpeg_merge", side_effect=fake_merge):
+    with mock.patch(
+        "pyt.api.combined.SabrSession", return_value=fake_session
+    ), mock.patch("pyt.api.combined.run_ffmpeg_merge", side_effect=fake_merge):
         plan.run()
 
     itags_seen = {ev[0] for ev in progress_events}

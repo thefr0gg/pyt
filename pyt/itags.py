@@ -1,4 +1,5 @@
 """This module contains a lookup table of YouTube's itag values."""
+
 from typing import Dict
 
 PROGRESSIVE_VIDEO = {
@@ -146,8 +147,5 @@ def get_format_profile(itag: int) -> Dict:
         "is_live": itag in LIVE,
         "is_3d": itag in _3D,
         "is_hdr": itag in HDR,
-        "is_dash": (
-            itag in DASH_AUDIO
-            or itag in DASH_VIDEO
-        ),
+        "is_dash": (itag in DASH_AUDIO or itag in DASH_VIDEO),
     }

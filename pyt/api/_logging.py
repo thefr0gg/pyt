@@ -19,6 +19,7 @@ log output until the consumer asks for it. We add a
 to suppress the stdlib's "No handlers could be found" warning when
 loggers fire and nothing has been enabled.
 """
+
 from __future__ import annotations
 
 import logging
@@ -26,7 +27,6 @@ import os
 import sys
 from pathlib import Path
 from typing import Optional, Union
-
 
 # Sentinel so multiple enable_logging calls replace the previous
 # stderr handler instead of stacking them up.
@@ -43,10 +43,7 @@ def _ensure_null_handler() -> None:
     logging.
     """
     root = _pyt_root()
-    has_null = any(
-        isinstance(h, logging.NullHandler)
-        for h in root.handlers
-    )
+    has_null = any(isinstance(h, logging.NullHandler) for h in root.handlers)
     if not has_null:
         root.addHandler(logging.NullHandler())
 
@@ -122,13 +119,10 @@ def enable_logging(
     # Remove any handler we previously added — but leave the
     # NullHandler and any user-installed handlers alone.
     root.handlers = [
-        h for h in root.handlers
-        if not getattr(h, _PYT_HANDLER_ATTR, False)
+        h for h in root.handlers if not getattr(h, _PYT_HANDLER_ATTR, False)
     ]
 
-    fmt_str = fmt or (
-        "%(asctime)s %(levelname)-7s %(name)s :: %(message)s"
-    )
+    fmt_str = fmt or ("%(asctime)s %(levelname)-7s %(name)s :: %(message)s")
     formatter = logging.Formatter(fmt_str, datefmt="%H:%M:%S")
 
     stream_handler = logging.StreamHandler(stream or sys.stderr)
@@ -152,8 +146,7 @@ def disable_logging() -> None:
     """
     root = _pyt_root()
     root.handlers = [
-        h for h in root.handlers
-        if not getattr(h, _PYT_HANDLER_ATTR, False)
+        h for h in root.handlers if not getattr(h, _PYT_HANDLER_ATTR, False)
     ]
     # Set to a high level so even the user's own handlers (if any)
     # don't see records they would otherwise have shown.
@@ -182,10 +175,7 @@ def is_enabled() -> bool:
     Callers can use this to skip building expensive log payloads when
     nothing's listening.
     """
-    return any(
-        getattr(h, _PYT_HANDLER_ATTR, False)
-        for h in _pyt_root().handlers
-    )
+    return any(getattr(h, _PYT_HANDLER_ATTR, False) for h in _pyt_root().handlers)
 
 
 # ── diagnostic dump for bug reports ────────────────────────────────────────

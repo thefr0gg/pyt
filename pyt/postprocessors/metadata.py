@@ -1,4 +1,5 @@
 """Metadata embedding post-processor."""
+
 from __future__ import annotations
 
 import os
@@ -79,6 +80,16 @@ class FFmpegMetadataEmbedder(FFmpegPostProcessor):
 
         _try("title", lambda: youtube.title)
         _try("artist", lambda: youtube.author)
-        _try("date", lambda: youtube.publish_date.strftime("%Y%m%d") if youtube.publish_date else None)
-        _try("comment", lambda: (youtube.description or "")[:500].replace("\n", " ") or None)
+        _try(
+            "date",
+            lambda: (
+                youtube.publish_date.strftime("%Y%m%d")
+                if youtube.publish_date
+                else None
+            ),
+        )
+        _try(
+            "comment",
+            lambda: (youtube.description or "")[:500].replace("\n", " ") or None,
+        )
         return meta

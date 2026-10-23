@@ -1,4 +1,5 @@
 """Tests for the modern :mod:`pyt.api` surface."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -21,53 +22,113 @@ from pyt.api import (
 )
 from pyt.api.video import _hydrate_meta
 
-
 # ── helpers ────────────────────────────────────────────────────────────────
 
 
 def _fake_raw_streams():
     """Minimal synthetic raw streams sufficient for StreamSet tests."""
     from pyt.api._streams_hydrator import _RawStream
+
     return [
         # Progressive mp4 (audio+video)
         _RawStream(
-            itag=18, url="https://example.com/18", mime_type="video/mp4",
-            kind="video", subtype="mp4", video_codec="avc1.42001E",
-            audio_codec="mp4a.40.2", is_adaptive=False, is_progressive=True,
-            is_otf=False, bitrate=500000, filesize=5000000, filesize_approx=5000000,
-            resolution="360p", fps=30, abr=None, default_filename="video.mp4",
+            itag=18,
+            url="https://example.com/18",
+            mime_type="video/mp4",
+            kind="video",
+            subtype="mp4",
+            video_codec="avc1.42001E",
+            audio_codec="mp4a.40.2",
+            is_adaptive=False,
+            is_progressive=True,
+            is_otf=False,
+            bitrate=500000,
+            filesize=5000000,
+            filesize_approx=5000000,
+            resolution="360p",
+            fps=30,
+            abr=None,
+            default_filename="video.mp4",
         ),
         # Adaptive video mp4 720p
         _RawStream(
-            itag=136, url="https://example.com/136", mime_type="video/mp4",
-            kind="video", subtype="mp4", video_codec="avc1.4d401f",
-            audio_codec=None, is_adaptive=True, is_progressive=False,
-            is_otf=False, bitrate=1500000, filesize=15000000, filesize_approx=15000000,
-            resolution="720p", fps=30, abr=None, default_filename="video.mp4",
+            itag=136,
+            url="https://example.com/136",
+            mime_type="video/mp4",
+            kind="video",
+            subtype="mp4",
+            video_codec="avc1.4d401f",
+            audio_codec=None,
+            is_adaptive=True,
+            is_progressive=False,
+            is_otf=False,
+            bitrate=1500000,
+            filesize=15000000,
+            filesize_approx=15000000,
+            resolution="720p",
+            fps=30,
+            abr=None,
+            default_filename="video.mp4",
         ),
         # Adaptive video mp4 1080p
         _RawStream(
-            itag=137, url="https://example.com/137", mime_type="video/mp4",
-            kind="video", subtype="mp4", video_codec="avc1.640028",
-            audio_codec=None, is_adaptive=True, is_progressive=False,
-            is_otf=False, bitrate=3000000, filesize=30000000, filesize_approx=30000000,
-            resolution="1080p", fps=30, abr=None, default_filename="video.mp4",
+            itag=137,
+            url="https://example.com/137",
+            mime_type="video/mp4",
+            kind="video",
+            subtype="mp4",
+            video_codec="avc1.640028",
+            audio_codec=None,
+            is_adaptive=True,
+            is_progressive=False,
+            is_otf=False,
+            bitrate=3000000,
+            filesize=30000000,
+            filesize_approx=30000000,
+            resolution="1080p",
+            fps=30,
+            abr=None,
+            default_filename="video.mp4",
         ),
         # Adaptive audio mp4
         _RawStream(
-            itag=140, url="https://example.com/140", mime_type="audio/mp4",
-            kind="audio", subtype="mp4", video_codec=None,
-            audio_codec="mp4a.40.2", is_adaptive=True, is_progressive=False,
-            is_otf=False, bitrate=128000, filesize=3000000, filesize_approx=3000000,
-            resolution=None, fps=None, abr="128kbps", default_filename="audio.mp4",
+            itag=140,
+            url="https://example.com/140",
+            mime_type="audio/mp4",
+            kind="audio",
+            subtype="mp4",
+            video_codec=None,
+            audio_codec="mp4a.40.2",
+            is_adaptive=True,
+            is_progressive=False,
+            is_otf=False,
+            bitrate=128000,
+            filesize=3000000,
+            filesize_approx=3000000,
+            resolution=None,
+            fps=None,
+            abr="128kbps",
+            default_filename="audio.mp4",
         ),
         # Adaptive audio webm (higher bitrate → best())
         _RawStream(
-            itag=251, url="https://example.com/251", mime_type="audio/webm",
-            kind="audio", subtype="webm", video_codec=None,
-            audio_codec="opus", is_adaptive=True, is_progressive=False,
-            is_otf=False, bitrate=160000, filesize=3500000, filesize_approx=3500000,
-            resolution=None, fps=None, abr="160kbps", default_filename="audio.webm",
+            itag=251,
+            url="https://example.com/251",
+            mime_type="audio/webm",
+            kind="audio",
+            subtype="webm",
+            video_codec=None,
+            audio_codec="opus",
+            is_adaptive=True,
+            is_progressive=False,
+            is_otf=False,
+            bitrate=160000,
+            filesize=3500000,
+            filesize_approx=3500000,
+            resolution=None,
+            fps=None,
+            abr="160kbps",
+            default_filename="audio.webm",
         ),
     ]
 
@@ -80,7 +141,9 @@ def _make_video(cipher_signature):
     pr = cipher_signature._vid_info
     url = f"https://youtube.com/watch?v={cipher_signature.video_id}"
     meta = _hydrate_meta(pr, url=url)
-    video = Video(player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={})
+    video = Video(
+        player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={}
+    )
     video._streams = StreamSet._from_raw(_fake_raw_streams(), video=video)
     video._sabr_config = _SabrConfig()
     return video
@@ -138,7 +201,9 @@ def _make_age_restricted_video(age_restricted: bool = True):
             "author": "Test",
         }
     }
-    return Video(player_response=fake_pr, meta=meta, client_name="ANDROID_VR", client_cfg={})
+    return Video(
+        player_response=fake_pr, meta=meta, client_name="ANDROID_VR", client_cfg={}
+    )
 
 
 # ── Client ─────────────────────────────────────────────────────────────────
@@ -196,7 +261,9 @@ def test_hydrate_meta_from_cipher_fixture(cipher_signature):
 def test_video_exposes_typed_props(cipher_signature):
     pr = cipher_signature._vid_info
     meta = _hydrate_meta(pr, url="https://youtube.com/watch?v=2lAe1cqCOXo")
-    video = Video(player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={})
+    video = Video(
+        player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={}
+    )
     assert video.video_id == cipher_signature.video_id
     assert video.title == meta.title
     assert isinstance(video.length, timedelta)
@@ -296,7 +363,9 @@ def test_download_run_transfers_bytes(cipher_signature):
     video = _make_video(cipher_signature)
     stream = video.streams.audio.best()
     fake_path = "/tmp/fake.mp4"
-    with mock.patch("pyt.api.download.Download._transfer_bytes", return_value=fake_path):
+    with mock.patch(
+        "pyt.api.download.Download._transfer_bytes", return_value=fake_path
+    ):
         result = stream.download_to("/tmp", filename="x").run()
     assert isinstance(result, Path)
     assert result == Path(fake_path)
@@ -325,7 +394,9 @@ def test_download_pipeline_runs_steps_in_order(cipher_signature):
     one = _Recording(name="one")
     two = _Recording(name="two")
 
-    with mock.patch("pyt.api.download.Download._transfer_bytes", return_value="/tmp/raw.mp4"):
+    with mock.patch(
+        "pyt.api.download.Download._transfer_bytes", return_value="/tmp/raw.mp4"
+    ):
         result = (stream.download_to() | one | two).run()
     assert calls == [("one", "/tmp/raw.mp4"), ("two", "/tmp/raw.mp4.one")]
     assert result == Path("/tmp/raw.mp4.one.two")
@@ -341,7 +412,9 @@ def test_download_step_failure_wrapped_as_postprocess_error(cipher_signature):
         def apply(self, path, *, stream, video):
             raise RuntimeError("ffmpeg said no")
 
-    with mock.patch("pyt.api.download.Download._transfer_bytes", return_value="/tmp/raw.mp4"):
+    with mock.patch(
+        "pyt.api.download.Download._transfer_bytes", return_value="/tmp/raw.mp4"
+    ):
         with pytest.raises(PostProcessError) as exc_info:
             (stream.download_to() | _Boom(name="boom")).run()
     assert exc_info.value.step == "boom"
@@ -427,8 +500,9 @@ def test_client_video_does_not_emit_deprecation_warning():
         }
     }
 
-    with mock.patch("pyt.api._player.fetch_player_response") as mock_fetch, \
-         mock.patch("pyt.extract.video_id", return_value="dQw4w9WgXcQ"):
+    with mock.patch("pyt.api._player.fetch_player_response") as mock_fetch, mock.patch(
+        "pyt.extract.video_id", return_value="dQw4w9WgXcQ"
+    ):
         mock_fetch.return_value = (fake_pr, "ANDROID_VR", {}, False)
         with warnings_mod.catch_warnings():
             warnings_mod.simplefilter("error", DeprecationWarning)
@@ -455,30 +529,35 @@ def test_client_playlist_returns_modern_wrapper():
     from pyt.api.playlists import Playlist as ModernPlaylist
     from pyt import Client
 
-    fake_legacy = mock.MagicMock()
-    fake_legacy.playlist_id = "PLxxx"
-    fake_legacy.playlist_url = "https://x"
-    fake_legacy.title = "Hello"
+    fake_page = {"metadata": {"playlistMetadataRenderer": {"title": "Hello"}}}
 
-    with mock.patch("pyt.contrib.playlist.Playlist", return_value=fake_legacy):
+    with mock.patch("pyt.innertube.InnerTube.browse", return_value=fake_page):
         result = Client().playlist("https://youtube.com/playlist?list=PLxxx")
 
-    assert isinstance(result, ModernPlaylist)
-    assert result.playlist_id == "PLxxx"
-    assert result.title == "Hello"
+        assert isinstance(result, ModernPlaylist)
+        assert result.playlist_id == "PLxxx"
+        assert result.title == "Hello"
 
 
 def test_modern_playlist_iter_yields_videos():
     from pyt.api.playlists import Playlist as ModernPlaylist
 
-    fake_legacy = mock.MagicMock()
-    fake_legacy.video_urls = ["url1", "url2"]
-
     fake_client = mock.MagicMock()
     fake_client.video.side_effect = lambda u: f"video<{u}>"
 
-    pl = ModernPlaylist(legacy=fake_legacy, client=fake_client)
-    assert list(pl.videos()) == ["video<url1>", "video<url2>"]
+    fake_videos = [
+        {"video_id": "url1", "title": "A", "duration_text": None},
+        {"video_id": "url2", "title": "B", "duration_text": None},
+    ]
+
+    pl = ModernPlaylist(playlist_id="PLxxx", client=fake_client)
+    with mock.patch(
+        "pyt.api.playlists.iter_playlist_videos", return_value=iter(fake_videos)
+    ):
+        assert list(pl.videos()) == [
+            "video<https://www.youtube.com/watch?v=url1>",
+            "video<https://www.youtube.com/watch?v=url2>",
+        ]
     assert fake_client.video.call_count == 2
 
 
@@ -486,19 +565,16 @@ def test_client_channel_returns_channel_feed():
     from pyt.api.playlists import ChannelFeed
     from pyt import Client
 
-    fake_legacy = mock.MagicMock()
-    fake_legacy.playlist_id = "UCxxx"
-    fake_legacy.playlist_url = "https://x"
-    fake_legacy.title = "Some Channel"
-    fake_legacy.channel_id = "UCxxx"
-    fake_legacy.channel_name = "Some Channel"
+    fake_home = {"metadata": {"channelMetadataRenderer": {"title": "Some Channel"}}}
 
-    with mock.patch("pyt.contrib.channel.Channel", return_value=fake_legacy):
+    with mock.patch(
+        "pyt.api.playlists.resolve_channel_id", return_value="UCxxx"
+    ), mock.patch("pyt.innertube.InnerTube.browse", return_value=fake_home):
         result = Client().channel("https://youtube.com/@someone")
 
-    assert isinstance(result, ChannelFeed)
-    assert result.channel_id == "UCxxx"
-    assert result.name == "Some Channel"
+        assert isinstance(result, ChannelFeed)
+        assert result.channel_id == "UCxxx"
+        assert result.name == "Some Channel"
 
 
 def test_client_search_returns_modern_wrapper():
@@ -522,7 +598,8 @@ def test_hydrate_meta_active_live_stream():
     from pyt.api.video import _hydrate_meta
 
     pr = _make_player_response(
-        is_live=True, is_live_content=True,
+        is_live=True,
+        is_live_content=True,
         hls_url="https://manifest.example.com/live.m3u8",
     )
     meta = _hydrate_meta(pr, url="https://youtube.com/watch?v=liveXYZ")
@@ -578,7 +655,9 @@ def test_video_is_live_content_property():
 
     pr = _make_player_response(is_live=False, is_live_content=True)
     meta = _hydrate_meta(pr, url="https://youtube.com/watch?v=liveXYZ")
-    video = Video(player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={})
+    video = Video(
+        player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={}
+    )
     assert video.is_live_content is True
     assert video.is_live is False
     assert video.hls_manifest_url is None
@@ -599,10 +678,13 @@ def test_record_live_calls_ffmpeg(tmp_path):
     hls_url = "https://manifest.example.com/live.m3u8"
     pr = _make_player_response(is_live=True, is_live_content=True, hls_url=hls_url)
     meta = _hydrate_meta(pr, url="https://youtube.com/watch?v=liveXYZ")
-    video = Video(player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={})
+    video = Video(
+        player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={}
+    )
 
-    with mock.patch("pyt.api.video.shutil.which", return_value="/usr/bin/ffmpeg"), \
-         mock.patch("pyt.api.video.subprocess.run") as mock_run:
+    with mock.patch(
+        "pyt.api.video.shutil.which", return_value="/usr/bin/ffmpeg"
+    ), mock.patch("pyt.api.video.subprocess.run") as mock_run:
         mock_run.return_value = mock.Mock(returncode=0)
         result = video.record_live(output_path=str(tmp_path))
 
@@ -620,10 +702,13 @@ def test_record_live_passes_timeout(tmp_path):
     hls_url = "https://manifest.example.com/live.m3u8"
     pr = _make_player_response(is_live=True, hls_url=hls_url)
     meta = _hydrate_meta(pr, url="https://youtube.com/watch?v=liveXYZ")
-    video = Video(player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={})
+    video = Video(
+        player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={}
+    )
 
-    with mock.patch("pyt.api.video.shutil.which", return_value="/usr/bin/ffmpeg"), \
-         mock.patch("pyt.api.video.subprocess.run") as mock_run:
+    with mock.patch(
+        "pyt.api.video.shutil.which", return_value="/usr/bin/ffmpeg"
+    ), mock.patch("pyt.api.video.subprocess.run") as mock_run:
         mock_run.return_value = mock.Mock(returncode=0)
         video.record_live(output_path=str(tmp_path), timeout=60)
 
@@ -637,7 +722,9 @@ def test_record_live_raises_when_ffmpeg_missing(tmp_path):
 
     pr = _make_player_response(is_live=True, hls_url="https://x.example.com/live.m3u8")
     meta = _hydrate_meta(pr, url="https://youtube.com/watch?v=liveXYZ")
-    video = Video(player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={})
+    video = Video(
+        player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={}
+    )
 
     with mock.patch("pyt.api.video.shutil.which", return_value=None):
         with pytest.raises(RuntimeError, match="ffmpeg not found"):

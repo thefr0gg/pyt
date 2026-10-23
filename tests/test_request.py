@@ -8,6 +8,7 @@ from urllib.error import URLError
 from pyt import request
 from pyt.exceptions import MaxRetriesExceeded
 
+
 @mock.patch("pyt.request.urlopen")
 def test_streaming(mock_urlopen):
     # Given
@@ -24,15 +25,15 @@ def test_streaming(mock_urlopen):
     # When
     response = request.stream("http://fakeassurl.gov/streaming_test")
     # Then
-    assert len(b''.join(response)) == 3 * 8 * 1024
+    assert len(b"".join(response)) == 3 * 8 * 1024
     assert mock_response.read.call_count == 4
 
 
-@mock.patch('pyt.request.urlopen')
+@mock.patch("pyt.request.urlopen")
 def test_timeout(mock_urlopen):
-    exc = URLError(reason=socket.timeout('timed_out'))
+    exc = URLError(reason=socket.timeout("timed_out"))
     mock_urlopen.side_effect = exc
-    generator = request.stream('http://fakeassurl.gov/timeout_test', timeout=1)
+    generator = request.stream("http://fakeassurl.gov/timeout_test", timeout=1)
     with pytest.raises(MaxRetriesExceeded):
         next(generator)
 

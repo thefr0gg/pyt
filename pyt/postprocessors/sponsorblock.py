@@ -1,4 +1,5 @@
 """SponsorBlock integration post-processor."""
+
 from __future__ import annotations
 
 import json
@@ -33,25 +34,27 @@ ALL_CATEGORIES = [
 ]
 
 _LABELS = {
-    "sponsor":        "Sponsor",
-    "intro":          "Intro",
-    "outro":          "Outro",
-    "selfpromo":      "Self-Promotion",
-    "preview":        "Preview",
-    "filler":         "Filler",
-    "interaction":    "Interaction",
+    "sponsor": "Sponsor",
+    "intro": "Intro",
+    "outro": "Outro",
+    "selfpromo": "Self-Promotion",
+    "preview": "Preview",
+    "filler": "Filler",
+    "interaction": "Interaction",
     "music_offtopic": "Non-Music",
-    "hook":           "Hook",
-    "poi_highlight":  "Highlight",
+    "hook": "Hook",
+    "poi_highlight": "Highlight",
 }
 
 
 def _fetch_segments(video_id: str, categories: List[str]) -> List[dict]:
     """Query the SponsorBlock API for segments of *video_id*."""
-    params = urllib.parse.urlencode({
-        "videoID": video_id,
-        "categories": json.dumps(categories),
-    })
+    params = urllib.parse.urlencode(
+        {
+            "videoID": video_id,
+            "categories": json.dumps(categories),
+        }
+    )
     url = f"{_API}?{params}"
     try:
         with urllib.request.urlopen(url, timeout=10) as resp:  # nosec
@@ -120,14 +123,21 @@ class SponsorBlockPP(FFmpegPostProcessor):
 
             ext = os.path.splitext(file_path)[1]
             tmp = self._temp_path(file_path, ext)
-            self._run_ffmpeg([
-                "-i", file_path,
-                "-i", meta_path,
-                "-map_metadata", "1",
-                "-map_chapters", "1",
-                "-codec", "copy",
-                tmp,
-            ])
+            self._run_ffmpeg(
+                [
+                    "-i",
+                    file_path,
+                    "-i",
+                    meta_path,
+                    "-map_metadata",
+                    "1",
+                    "-map_chapters",
+                    "1",
+                    "-codec",
+                    "copy",
+                    tmp,
+                ]
+            )
             return self._replace_file(tmp, file_path)
         finally:
             if os.path.exists(meta_path):
@@ -144,12 +154,17 @@ class SponsorBlockPP(FFmpegPostProcessor):
 
         ext = os.path.splitext(file_path)[1]
         tmp = self._temp_path(file_path, ext)
-        self._run_ffmpeg([
-            "-i", file_path,
-            "-vf", f"select='{expr}',setpts=N/FRAME_RATE/TB",
-            "-af", f"aselect='{expr}',asetpts=N/SR/TB",
-            tmp,
-        ])
+        self._run_ffmpeg(
+            [
+                "-i",
+                file_path,
+                "-vf",
+                f"select='{expr}',setpts=N/FRAME_RATE/TB",
+                "-af",
+                f"aselect='{expr}',asetpts=N/SR/TB",
+                tmp,
+            ]
+        )
         return self._replace_file(tmp, file_path)
 
     # ── helpers ──────────────────────────────────────────────────────────────
@@ -160,9 +175,11 @@ class SponsorBlockPP(FFmpegPostProcessor):
         for seg in segments:
             s, e = seg["segment"]
             cat = seg.get("category", "sponsor")
-            chapters.append({
-                "start_ms": int(s * 1000),
-                "end_ms":   int(e * 1000),
-                "title":    f"[SponsorBlock] {_LABELS.get(cat, cat.title())}",
-            })
+            chapters.append(
+                {
+                    "start_ms": int(s * 1000),
+                    "end_ms": int(e * 1000),
+                    "title": f"[SponsorBlock] {_LABELS.get(cat, cat.title())}",
+                }
+            )
         return sorted(chapters, key=lambda c: c["start_ms"])

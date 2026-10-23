@@ -10,6 +10,7 @@ Field numbers verified against:
   yt_dlp/extractor/youtube/_proto/videostreaming/video_playback_abr_request.py
   yt_dlp/extractor/youtube/_proto/videostreaming/streamer_context.py
 """
+
 from __future__ import annotations
 
 import base64
@@ -32,7 +33,7 @@ def _format_id(itag: int) -> bytes:
 
 def _client_abr_state(track_types: int, player_time_ms: int = 0) -> bytes:
     """ClientAbrState { 28: player_time_ms, 40: enabled_track_types_bitfield }"""
-    msg = b''
+    msg = b""
     if player_time_ms:
         msg += field_varint(28, player_time_ms)
     msg += field_varint(40, track_types)
@@ -66,39 +67,39 @@ def _buffered_range(
 def _client_info(info: dict) -> bytes:
     """ClientInfo (innertube/client_info.py).
 
-      1  hl              (String)
-      2  gl              (String)
-      4  remote_host     (String)
-      12 device_make     (String)
-      13 device_model    (String)
-      14 visitor_data    (String)
-      15 user_agent      (String)
-      16 client_name     (ClientName enum / Int32)
-      17 client_version  (String)
-      18 os_name         (String)
-      19 os_version      (String)
+    1  hl              (String)
+    2  gl              (String)
+    4  remote_host     (String)
+    12 device_make     (String)
+    13 device_model    (String)
+    14 visitor_data    (String)
+    15 user_agent      (String)
+    16 client_name     (ClientName enum / Int32)
+    17 client_version  (String)
+    18 os_name         (String)
+    19 os_version      (String)
     """
-    out = b''
-    if info.get('hl'):
-        out += field_string(1, info['hl'])
-    if info.get('gl'):
-        out += field_string(2, info['gl'])
-    if info.get('device_make'):
-        out += field_string(12, info['device_make'])
-    if info.get('device_model'):
-        out += field_string(13, info['device_model'])
-    if info.get('visitor_data'):
-        out += field_string(14, info['visitor_data'])
-    if info.get('user_agent'):
-        out += field_string(15, info['user_agent'])
-    if info.get('client_name') is not None:
-        out += field_varint(16, int(info['client_name']))
-    if info.get('client_version'):
-        out += field_string(17, info['client_version'])
-    if info.get('os_name'):
-        out += field_string(18, info['os_name'])
-    if info.get('os_version'):
-        out += field_string(19, info['os_version'])
+    out = b""
+    if info.get("hl"):
+        out += field_string(1, info["hl"])
+    if info.get("gl"):
+        out += field_string(2, info["gl"])
+    if info.get("device_make"):
+        out += field_string(12, info["device_make"])
+    if info.get("device_model"):
+        out += field_string(13, info["device_model"])
+    if info.get("visitor_data"):
+        out += field_string(14, info["visitor_data"])
+    if info.get("user_agent"):
+        out += field_string(15, info["user_agent"])
+    if info.get("client_name") is not None:
+        out += field_varint(16, int(info["client_name"]))
+    if info.get("client_version"):
+        out += field_string(17, info["client_version"])
+    if info.get("os_name"):
+        out += field_string(18, info["os_name"])
+    if info.get("os_version"):
+        out += field_string(19, info["os_version"])
     return out
 
 
@@ -121,7 +122,7 @@ def _streamer_context(
         5: sabr_contexts           (repeated SabrContext)
         6: unsent_sabr_contexts    (repeated Int32)
     }"""
-    out = b''
+    out = b""
     if client_info:
         ci = _client_info(client_info)
         if ci:
@@ -130,9 +131,9 @@ def _streamer_context(
         out += field_bytes(2, po_token_bytes)
     if playback_cookie:
         out += field_bytes(3, playback_cookie)
-    for ctx_type, value in (sabr_contexts or []):
+    for ctx_type, value in sabr_contexts or []:
         out += field_message(5, _sabr_context(ctx_type, value))
-    for t in (unsent_sabr_contexts or []):
+    for t in unsent_sabr_contexts or []:
         out += field_varint(6, int(t))
     return out
 
@@ -169,21 +170,24 @@ def build_video_playback_abr_request(
     if audio_itag:
         track_types |= 1
 
-    msg = b''
+    msg = b""
 
     msg += field_message(1, _client_abr_state(track_types, player_time_ms))
 
-    for itag in (initialized_itags or []):
+    for itag in initialized_itags or []:
         msg += field_message(2, _format_id(itag))
 
-    for r in (buffered_ranges or []):
-        msg += field_message(3, _buffered_range(
-            itag=r['itag'],
-            start_time_ms=r.get('start_time_ms', 0),
-            duration_ms=r.get('duration_ms', 0),
-            start_segment_index=r.get('start_segment_index'),
-            end_segment_index=r.get('end_segment_index'),
-        ))
+    for r in buffered_ranges or []:
+        msg += field_message(
+            3,
+            _buffered_range(
+                itag=r["itag"],
+                start_time_ms=r.get("start_time_ms", 0),
+                duration_ms=r.get("duration_ms", 0),
+                start_segment_index=r.get("start_segment_index"),
+                end_segment_index=r.get("end_segment_index"),
+            ),
+        )
 
     if player_time_ms:
         msg += field_varint(4, player_time_ms)
@@ -197,7 +201,9 @@ def build_video_playback_abr_request(
         msg += field_message(17, _format_id(video_itag))
 
     sc = _streamer_context(
-        po_token, client_info, playback_cookie,
+        po_token,
+        client_info,
+        playback_cookie,
         sabr_contexts=sabr_contexts,
         unsent_sabr_contexts=unsent_sabr_contexts,
     )
@@ -211,10 +217,10 @@ def _decode_po_token(po_token: Optional[str]) -> Optional[bytes]:
     if not po_token:
         return None
     try:
-        padded = po_token + '=' * (-len(po_token) % 4)
+        padded = po_token + "=" * (-len(po_token) % 4)
         return base64.urlsafe_b64decode(padded)
     except Exception:
-        return po_token.encode('utf-8')
+        return po_token.encode("utf-8")
 
 
 # -- Single-format adapter (backwards-compatible) ------------------------------
@@ -258,10 +264,12 @@ class SabrClient:
 
         resume = None
         if self._already_downloaded > 0:
-            resume = {self._itag: _ResumeState(
-                downloaded_bytes=self._already_downloaded,
-                last_segment_index=-1,
-            )}
+            resume = {
+                self._itag: _ResumeState(
+                    downloaded_bytes=self._already_downloaded,
+                    last_segment_index=-1,
+                )
+            }
 
         session = SabrSession(
             sabr_url=self._sabr_url,

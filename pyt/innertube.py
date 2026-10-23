@@ -4,6 +4,7 @@ This module is NOT intended to be used directly by end users, as each of the
 interfaces returns raw results. These should instead be parsed to extract
 the useful information for the end user.
 """
+
 import os
 import json
 import time
@@ -14,258 +15,257 @@ from urllib import parse
 from pyt import request
 
 # YouTube on TV client secrets
-_client_id = '861556708454-d6dlm3lh05idd8npek18k6be8ba3oc68.apps.googleusercontent.com'
-_client_secret = 'SboVhoG9s0rNafixCSGGKXAT'
+_client_id = "861556708454-d6dlm3lh05idd8npek18k6be8ba3oc68.apps.googleusercontent.com"
+_client_secret = "SboVhoG9s0rNafixCSGGKXAT"
 
 # Extracted API keys -- unclear what these are linked to.
 _api_keys = [
-    'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8',
-    'AIzaSyCtkvNIR1HCEwzsqK6JuE6KqpyjusIRI30',
-    'AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w',
-    'AIzaSyC8UYZpvA2eknNex0Pjid0_eTLJoDu6los',
-    'AIzaSyCjc_pVEDi4qsv5MtC2dMXzpIaDoRFLsxw',
-    'AIzaSyDHQ9ipnphqTzDqZsbtd8_Ru4_kiKVQe2k'
+    "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
+    "AIzaSyCtkvNIR1HCEwzsqK6JuE6KqpyjusIRI30",
+    "AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w",
+    "AIzaSyC8UYZpvA2eknNex0Pjid0_eTLJoDu6los",
+    "AIzaSyCjc_pVEDi4qsv5MtC2dMXzpIaDoRFLsxw",
+    "AIzaSyDHQ9ipnphqTzDqZsbtd8_Ru4_kiKVQe2k",
 ]
 
 _default_clients = {
-    'WEB': {
-        'context': {
-            'client': {
-                'clientName': 'WEB',
-                'clientVersion': '2.20241127.01.00',
-                'hl': 'en',
+    "WEB": {
+        "context": {
+            "client": {
+                "clientName": "WEB",
+                "clientVersion": "2.20241127.01.00",
+                "hl": "en",
             }
         },
-        'header': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-            'Accept-Language': 'en-US,en',
+        "header": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en",
         },
-        'api_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+        "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
     # ANDROID_VR at version ≤1.65 bypasses SABR-only stream enforcement and
     # returns direct signed URLs for all adaptive formats (same approach as
     # yt-dlp's android_vr client). Versions >1.65 return SABR-only streams.
-    'ANDROID_VR': {
-        'context': {
-            'client': {
-                'clientName': 'ANDROID_VR',
-                'clientVersion': '1.65.10',
-                'deviceMake': 'Oculus',
-                'deviceModel': 'Quest 3',
-                'androidSdkVersion': 32,
-                'hl': 'en',
-                'userAgent': 'com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip',
-                'osName': 'Android',
-                'osVersion': '12L',
+    "ANDROID_VR": {
+        "context": {
+            "client": {
+                "clientName": "ANDROID_VR",
+                "clientVersion": "1.65.10",
+                "deviceMake": "Oculus",
+                "deviceModel": "Quest 3",
+                "androidSdkVersion": 32,
+                "hl": "en",
+                "userAgent": "com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip",
+                "osName": "Android",
+                "osVersion": "12L",
             }
         },
-        'header': {
-            'User-Agent': 'com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip',
-            'X-Youtube-Client-Name': '28',
-            'X-Youtube-Client-Version': '1.65.10',
+        "header": {
+            "User-Agent": "com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip",
+            "X-Youtube-Client-Name": "28",
+            "X-Youtube-Client-Version": "1.65.10",
         },
-        'api_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+        "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
-    'ANDROID': {
-        'context': {
-            'client': {
-                'clientName': 'ANDROID',
-                'clientVersion': '21.16.7',
-                'androidSdkVersion': 34,
-                'hl': 'en',
-                'userAgent': 'com.google.android.youtube/21.16.7 (Linux; U; Android 14; en_US; Pixel 8; Build/UQ1A.240205.004; Cronet/113.0.5672.24)',
+    "ANDROID": {
+        "context": {
+            "client": {
+                "clientName": "ANDROID",
+                "clientVersion": "21.16.7",
+                "androidSdkVersion": 34,
+                "hl": "en",
+                "userAgent": "com.google.android.youtube/21.16.7 (Linux; U; Android 14; en_US; Pixel 8; Build/UQ1A.240205.004; Cronet/113.0.5672.24)",
             }
         },
-        'header': {
-            'User-Agent': 'com.google.android.youtube/21.16.7 (Linux; U; Android 14; en_US; Pixel 8; Build/UQ1A.240205.004; Cronet/113.0.5672.24)',
-            'X-Youtube-Client-Name': '3',
-            'X-Youtube-Client-Version': '21.16.7',
+        "header": {
+            "User-Agent": "com.google.android.youtube/21.16.7 (Linux; U; Android 14; en_US; Pixel 8; Build/UQ1A.240205.004; Cronet/113.0.5672.24)",
+            "X-Youtube-Client-Name": "3",
+            "X-Youtube-Client-Version": "21.16.7",
         },
-        'api_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+        "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
-    'IOS': {
-        'context': {
-            'client': {
-                'clientName': 'IOS',
-                'clientVersion': '19.45.4',
-                'deviceModel': 'iPhone16,2',
-                'hl': 'en',
-                'userAgent': 'com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X)',
+    "IOS": {
+        "context": {
+            "client": {
+                "clientName": "IOS",
+                "clientVersion": "19.45.4",
+                "deviceModel": "iPhone16,2",
+                "hl": "en",
+                "userAgent": "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X)",
             }
         },
-        'header': {
-            'User-Agent': 'com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X)',
-            'X-Youtube-Client-Name': '5',
-            'X-Youtube-Client-Version': '19.45.4',
+        "header": {
+            "User-Agent": "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X)",
+            "X-Youtube-Client-Name": "5",
+            "X-Youtube-Client-Version": "19.45.4",
         },
-        'api_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+        "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
-
-    'WEB_EMBED': {
-        'context': {
-            'client': {
-                'clientName': 'WEB_EMBEDDED_PLAYER',
-                'clientVersion': '2.20241127.01.00',
-                'clientScreen': 'EMBED',
-                'hl': 'en',
+    "WEB_EMBED": {
+        "context": {
+            "client": {
+                "clientName": "WEB_EMBEDDED_PLAYER",
+                "clientVersion": "2.20241127.01.00",
+                "clientScreen": "EMBED",
+                "hl": "en",
             }
         },
-        'header': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        "header": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         },
-        'api_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+        "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
-    'ANDROID_EMBED': {
-        'context': {
-            'client': {
-                'clientName': 'ANDROID_EMBEDDED_PLAYER',
-                'clientVersion': '21.16.7',
-                'clientScreen': 'EMBED',
-                'androidSdkVersion': 34,
-                'hl': 'en',
+    "ANDROID_EMBED": {
+        "context": {
+            "client": {
+                "clientName": "ANDROID_EMBEDDED_PLAYER",
+                "clientVersion": "21.16.7",
+                "clientScreen": "EMBED",
+                "androidSdkVersion": 34,
+                "hl": "en",
             }
         },
-        'header': {
-            'User-Agent': 'com.google.android.youtube/21.16.7 (Linux; U; Android 14; en_US; Pixel 8; Build/UQ1A.240205.004; Cronet/113.0.5672.24)',
-            'X-Youtube-Client-Name': '55',
-            'X-Youtube-Client-Version': '21.16.7',
+        "header": {
+            "User-Agent": "com.google.android.youtube/21.16.7 (Linux; U; Android 14; en_US; Pixel 8; Build/UQ1A.240205.004; Cronet/113.0.5672.24)",
+            "X-Youtube-Client-Name": "55",
+            "X-Youtube-Client-Version": "21.16.7",
         },
-        'api_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+        "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
-    'IOS_EMBED': {
-        'context': {
-            'client': {
-                'clientName': 'IOS_MESSAGES_EXTENSION',
-                'clientVersion': '19.45.4',
-                'deviceModel': 'iPhone16,2',
-                'hl': 'en',
+    "IOS_EMBED": {
+        "context": {
+            "client": {
+                "clientName": "IOS_MESSAGES_EXTENSION",
+                "clientVersion": "19.45.4",
+                "deviceModel": "iPhone16,2",
+                "hl": "en",
             }
         },
-        'header': {
-            'User-Agent': 'com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X)',
+        "header": {
+            "User-Agent": "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X)",
         },
-        'api_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+        "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
-
-    'WEB_MUSIC': {
-        'context': {
-            'client': {
-                'clientName': 'WEB_REMIX',
-                'clientVersion': '1.20241127.01.00',
-                'hl': 'en',
+    "WEB_MUSIC": {
+        "context": {
+            "client": {
+                "clientName": "WEB_REMIX",
+                "clientVersion": "1.20241127.01.00",
+                "hl": "en",
             }
         },
-        'header': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        "header": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         },
-        'api_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+        "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
-    'ANDROID_MUSIC': {
-        'context': {
-            'client': {
-                'clientName': 'ANDROID_MUSIC',
-                'clientVersion': '7.27.52',
-                'androidSdkVersion': 34,
-                'hl': 'en',
+    "ANDROID_MUSIC": {
+        "context": {
+            "client": {
+                "clientName": "ANDROID_MUSIC",
+                "clientVersion": "7.27.52",
+                "androidSdkVersion": 34,
+                "hl": "en",
             }
         },
-        'header': {
-            'User-Agent': 'com.google.android.apps.youtube.music/7.27.52 (Linux; U; Android 14) gzip',
+        "header": {
+            "User-Agent": "com.google.android.apps.youtube.music/7.27.52 (Linux; U; Android 14) gzip",
         },
-        'api_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+        "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
-    'IOS_MUSIC': {
-        'context': {
-            'client': {
-                'clientName': 'IOS_MUSIC',
-                'clientVersion': '7.27.0',
-                'deviceModel': 'iPhone16,2',
-                'hl': 'en',
+    "IOS_MUSIC": {
+        "context": {
+            "client": {
+                "clientName": "IOS_MUSIC",
+                "clientVersion": "7.27.0",
+                "deviceModel": "iPhone16,2",
+                "hl": "en",
             }
         },
-        'header': {
-            'User-Agent': 'com.google.ios.youtubemusic/7.27.0 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X)',
+        "header": {
+            "User-Agent": "com.google.ios.youtubemusic/7.27.0 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X)",
         },
-        'api_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+        "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
-
-    'WEB_CREATOR': {
-        'context': {
-            'client': {
-                'clientName': 'WEB_CREATOR',
-                'clientVersion': '1.20241127.01.00',
-                'hl': 'en',
+    "WEB_CREATOR": {
+        "context": {
+            "client": {
+                "clientName": "WEB_CREATOR",
+                "clientVersion": "1.20241127.01.00",
+                "hl": "en",
             }
         },
-        'header': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        "header": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         },
-        'api_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+        "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
-    'ANDROID_CREATOR': {
-        'context': {
-            'client': {
-                'clientName': 'ANDROID_CREATOR',
-                'clientVersion': '24.45.100',
-                'androidSdkVersion': 34,
-                'hl': 'en',
+    "ANDROID_CREATOR": {
+        "context": {
+            "client": {
+                "clientName": "ANDROID_CREATOR",
+                "clientVersion": "24.45.100",
+                "androidSdkVersion": 34,
+                "hl": "en",
             }
         },
-        'header': {
-            'User-Agent': 'com.google.android.apps.youtube.creator/24.45.100 (Linux; U; Android 14) gzip',
+        "header": {
+            "User-Agent": "com.google.android.apps.youtube.creator/24.45.100 (Linux; U; Android 14) gzip",
         },
-        'api_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+        "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
-    'IOS_CREATOR': {
-        'context': {
-            'client': {
-                'clientName': 'IOS_CREATOR',
-                'clientVersion': '24.45.100',
-                'deviceModel': 'iPhone16,2',
-                'hl': 'en',
+    "IOS_CREATOR": {
+        "context": {
+            "client": {
+                "clientName": "IOS_CREATOR",
+                "clientVersion": "24.45.100",
+                "deviceModel": "iPhone16,2",
+                "hl": "en",
             }
         },
-        'header': {
-            'User-Agent': 'com.google.ios.ytcreator/24.45.100 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X)',
+        "header": {
+            "User-Agent": "com.google.ios.ytcreator/24.45.100 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X)",
         },
-        'api_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+        "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
-
-    'MWEB': {
-        'context': {
-            'client': {
-                'clientName': 'MWEB',
-                'clientVersion': '2.20241127.00.00',
-                'hl': 'en',
+    "MWEB": {
+        "context": {
+            "client": {
+                "clientName": "MWEB",
+                "clientVersion": "2.20241127.00.00",
+                "hl": "en",
             }
         },
-        'header': {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
+        "header": {
+            "User-Agent": "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
         },
-        'api_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+        "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
-
-    'TV_EMBED': {
-        'context': {
-            'client': {
-                'clientName': 'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
-                'clientVersion': '2.0',
-                'hl': 'en',
+    "TV_EMBED": {
+        "context": {
+            "client": {
+                "clientName": "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
+                "clientVersion": "2.0",
+                "hl": "en",
             }
         },
-        'header': {
-            'User-Agent': 'Mozilla/5.0 (SMART-TV; LINUX; Tizen 6.5) AppleWebKit/538.1 (KHTML, like Gecko) Version/6.5 TV Safari/538.1',
+        "header": {
+            "User-Agent": "Mozilla/5.0 (SMART-TV; LINUX; Tizen 6.5) AppleWebKit/538.1 (KHTML, like Gecko) Version/6.5 TV Safari/538.1",
         },
-        'api_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+        "api_key": "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
     },
 }
 _token_timeout = 1800
-_cache_dir = pathlib.Path(__file__).parent.resolve() / '__cache__'
-_token_file = os.path.join(_cache_dir, 'tokens.json')
+_cache_dir = pathlib.Path(__file__).parent.resolve() / "__cache__"
+_token_file = os.path.join(_cache_dir, "tokens.json")
+
 
 class InnerTube:
     """Object for interacting with the innertube API."""
-    def __init__(self, client='ANDROID', use_oauth=False, allow_cache=True, client_version=None):
+
+    def __init__(
+        self, client="ANDROID", use_oauth=False, allow_cache=True, client_version=None
+    ):
         """Initialize an InnerTube object.
 
         :param str client:
@@ -279,14 +279,15 @@ class InnerTube:
             Useful for web-based clients whose version can be read from the page.
         """
         self.client_name = client
-        self.context = _default_clients[client]['context']
-        self.header = _default_clients[client]['header']
-        self.api_key = _default_clients[client]['api_key']
+        self.context = _default_clients[client]["context"]
+        self.header = _default_clients[client]["header"]
+        self.api_key = _default_clients[client]["api_key"]
 
         if client_version:
             import copy
+
             self.context = copy.deepcopy(self.context)
-            self.context['client']['clientVersion'] = client_version
+            self.context["client"]["clientVersion"] = client_version
         self.access_token = None
         self.refresh_token = None
         self.use_oauth = use_oauth
@@ -301,9 +302,9 @@ class InnerTube:
             if os.path.exists(_token_file):
                 with open(_token_file) as f:
                     data = json.load(f)
-                    self.access_token = data['access_token']
-                    self.refresh_token = data['refresh_token']
-                    self.expires = data['expires']
+                    self.access_token = data["access_token"]
+                    self.refresh_token = data["refresh_token"]
+                    self.expires = data["expires"]
                     self.refresh_bearer_token()
 
     def cache_tokens(self):
@@ -312,13 +313,13 @@ class InnerTube:
             return
 
         data = {
-            'access_token': self.access_token,
-            'refresh_token': self.refresh_token,
-            'expires': self.expires
+            "access_token": self.access_token,
+            "refresh_token": self.refresh_token,
+            "expires": self.expires,
         }
         if not os.path.exists(_cache_dir):
             os.mkdir(_cache_dir)
-        with open(_token_file, 'w') as f:
+        with open(_token_file, "w") as f:
             json.dump(data, f)
 
     def refresh_bearer_token(self, force=False):
@@ -336,23 +337,21 @@ class InnerTube:
         # Subtracting 30 seconds is arbitrary to avoid potential time discrepencies
         start_time = int(time.time() - 30)
         data = {
-            'client_id': _client_id,
-            'client_secret': _client_secret,
-            'grant_type': 'refresh_token',
-            'refresh_token': self.refresh_token
+            "client_id": _client_id,
+            "client_secret": _client_secret,
+            "grant_type": "refresh_token",
+            "refresh_token": self.refresh_token,
         }
         response = request._execute_request(
-            'https://oauth2.googleapis.com/token',
-            'POST',
-            headers={
-                'Content-Type': 'application/json'
-            },
-            data=data
+            "https://oauth2.googleapis.com/token",
+            "POST",
+            headers={"Content-Type": "application/json"},
+            data=data,
         )
         response_data = json.loads(response.read())
 
-        self.access_token = response_data['access_token']
-        self.expires = start_time + response_data['expires_in']
+        self.access_token = response_data["access_token"]
+        self.expires = start_time + response_data["expires_in"]
         self.cache_tokens()
 
     def fetch_bearer_token(self):
@@ -360,104 +359,134 @@ class InnerTube:
         # Subtracting 30 seconds is arbitrary to avoid potential time discrepencies
         start_time = int(time.time() - 30)
         data = {
-            'client_id': _client_id,
-            'scope': 'https://www.googleapis.com/auth/youtube'
+            "client_id": _client_id,
+            "scope": "https://www.googleapis.com/auth/youtube",
         }
         response = request._execute_request(
-            'https://oauth2.googleapis.com/device/code',
-            'POST',
-            headers={
-                'Content-Type': 'application/json'
-            },
-            data=data
+            "https://oauth2.googleapis.com/device/code",
+            "POST",
+            headers={"Content-Type": "application/json"},
+            data=data,
         )
         response_data = json.loads(response.read())
-        verification_url = response_data['verification_url']
-        user_code = response_data['user_code']
-        print(f'Please open {verification_url} and input code {user_code}')
-        input('Press enter when you have completed this step.')
+        verification_url = response_data["verification_url"]
+        user_code = response_data["user_code"]
+        print(f"Please open {verification_url} and input code {user_code}")
+        input("Press enter when you have completed this step.")
 
         data = {
-            'client_id': _client_id,
-            'client_secret': _client_secret,
-            'device_code': response_data['device_code'],
-            'grant_type': 'urn:ietf:params:oauth:grant-type:device_code'
+            "client_id": _client_id,
+            "client_secret": _client_secret,
+            "device_code": response_data["device_code"],
+            "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
         }
         response = request._execute_request(
-            'https://oauth2.googleapis.com/token',
-            'POST',
-            headers={
-                'Content-Type': 'application/json'
-            },
-            data=data
+            "https://oauth2.googleapis.com/token",
+            "POST",
+            headers={"Content-Type": "application/json"},
+            data=data,
         )
         response_data = json.loads(response.read())
 
-        self.access_token = response_data['access_token']
-        self.refresh_token = response_data['refresh_token']
-        self.expires = start_time + response_data['expires_in']
+        self.access_token = response_data["access_token"]
+        self.refresh_token = response_data["refresh_token"]
+        self.expires = start_time + response_data["expires_in"]
         self.cache_tokens()
 
     @property
     def base_url(self):
         """Return the base url endpoint for the innertube API."""
-        return 'https://www.youtube.com/youtubei/v1'
+        return "https://www.youtube.com/youtubei/v1"
 
     @property
     def base_data(self):
         """Return the base json data to transmit to the innertube API."""
-        return {
-            'context': self.context
-        }
+        return {"context": self.context}
 
     @property
     def base_params(self):
         """Return the base query parameters to transmit to the innertube API."""
         return {
-            'prettyPrint': False,
+            "prettyPrint": False,
         }
 
     @property
     def base_body(self):
         """Return base fields merged into POST body for innertube requests."""
         return {
-            'contentCheckOk': True,
-            'racyCheckOk': True,
+            "contentCheckOk": True,
+            "racyCheckOk": True,
         }
 
     def _call_api(self, endpoint, query, data):
         """Make a request to a given endpoint with the provided query parameters and data."""
-        endpoint_url = f'{endpoint}?{parse.urlencode(query)}' if query else endpoint
+        endpoint_url = f"{endpoint}?{parse.urlencode(query)}" if query else endpoint
         headers = {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
         }
         # Add the bearer token if applicable
         if self.use_oauth:
             if self.access_token:
                 self.refresh_bearer_token()
-                headers['Authorization'] = f'Bearer {self.access_token}'
+                headers["Authorization"] = f"Bearer {self.access_token}"
             else:
                 self.fetch_bearer_token()
-                headers['Authorization'] = f'Bearer {self.access_token}'
+                headers["Authorization"] = f"Bearer {self.access_token}"
 
         headers.update(self.header)
 
         response = request._execute_request(
-            endpoint_url,
-            'POST',
-            headers=headers,
-            data=data
+            endpoint_url, "POST", headers=headers, data=data
         )
         return json.loads(response.read())
 
-    def browse(self):
+    def browse(self, browse_id=None, *, params=None, continuation=None):
         """Make a request to the browse endpoint.
 
-        TODO: Figure out how we can use this
+        Used for channel pages and playlists. Either ``browse_id`` (a
+        channel id, ``VL``-prefixed playlist id, etc.) with optional
+        ``params`` (an opaque tab selector, e.g. the Videos tab), or
+        ``continuation`` (a token from a previous browse/next response)
+        to page through a list — never both.
+
+        Unlike :meth:`player` and :meth:`search`, this endpoint rejects
+        requests with no ``key`` query parameter, so it's added here.
+
+        :param str browse_id:
+            A channel id or ``VL``-prefixed playlist id.
+        :param str params:
+            Opaque tab-selector params from a channel's tab endpoint.
+        :param str continuation:
+            A continuation token to page through a list.
+        :rtype: dict
         """
-        # endpoint = f'{self.base_url}/browse'  # noqa:E800
-        ...
-        # return self._call_api(endpoint, query, self.base_data)  # noqa:E800
+        endpoint = f"{self.base_url}/browse"
+        data = {}
+        if continuation:
+            data["continuation"] = continuation
+        else:
+            data["browseId"] = browse_id
+            if params:
+                data["params"] = params
+        data.update(self.base_data)
+        query = dict(self.base_params)
+        query["key"] = self.api_key
+        return self._call_api(endpoint, query, data)
+
+    def resolve_url(self, url):
+        """Resolve a canonical/vanity URL (e.g. a channel handle) to its
+        navigation endpoint, which carries the real channel id.
+
+        :param str url:
+            A full YouTube URL, e.g. ``https://www.youtube.com/@handle``.
+        :rtype: dict
+        """
+        endpoint = f"{self.base_url}/navigation/resolve_url"
+        data = {"url": url}
+        data.update(self.base_data)
+        query = dict(self.base_params)
+        query["key"] = self.api_key
+        return self._call_api(endpoint, query, data)
 
     def config(self):
         """Make a request to the config endpoint.
@@ -477,14 +506,25 @@ class InnerTube:
         ...
         # return self._call_api(endpoint, query, self.base_data)  # noqa:E800
 
-    def next(self):
+    def next(self, *, continuation=None):
         """Make a request to the next endpoint.
 
-        TODO: Figure out how we can use this
+        Used to page through a watch-next list; not needed for channel
+        or playlist paging (those use :meth:`browse` with a continuation
+        token instead).
+
+        :param str continuation:
+            A continuation token.
+        :rtype: dict
         """
-        # endpoint = f'{self.base_url}/next'  # noqa:E800
-        ...
-        # return self._call_api(endpoint, query, self.base_data)  # noqa:E800
+        endpoint = f"{self.base_url}/next"
+        data = {}
+        if continuation:
+            data["continuation"] = continuation
+        data.update(self.base_data)
+        query = dict(self.base_params)
+        query["key"] = self.api_key
+        return self._call_api(endpoint, query, data)
 
     def player(self, video_id, visitor_data=None):
         """Make a request to the player endpoint.
@@ -498,16 +538,16 @@ class InnerTube:
         :returns:
             Raw player info results.
         """
-        endpoint = f'{self.base_url}/player'
+        endpoint = f"{self.base_url}/player"
         data = {
-            'videoId': video_id,
+            "videoId": video_id,
         }
         data.update(self.base_body)
         context = dict(self.base_data)
         if visitor_data:
-            context['context'] = dict(context.get('context', {}))
-            context['context']['client'] = dict(context['context'].get('client', {}))
-            context['context']['client']['visitorData'] = visitor_data
+            context["context"] = dict(context.get("context", {}))
+            context["context"]["client"] = dict(context["context"].get("client", {}))
+            context["context"]["client"]["visitorData"] = visitor_data
         data.update(context)
         return self._call_api(endpoint, self.base_params, data)
 
@@ -520,12 +560,12 @@ class InnerTube:
         :returns:
             Raw search query results.
         """
-        endpoint = f'{self.base_url}/search'
+        endpoint = f"{self.base_url}/search"
         data = {
-            'query': search_query,
+            "query": search_query,
         }
         if continuation:
-            data['continuation'] = continuation
+            data["continuation"] = continuation
         data.update(self.base_body)
         data.update(self.base_data)
         return self._call_api(endpoint, self.base_params, data)
@@ -543,14 +583,10 @@ class InnerTube:
         :returns:
             Returns information that includes a URL for bypassing certain restrictions.
         """
-        endpoint = f'{self.base_url}/verify_age'
+        endpoint = f"{self.base_url}/verify_age"
         data = {
-            'nextEndpoint': {
-                'urlEndpoint': {
-                    'url': f'/watch?v={video_id}'
-                }
-            },
-            'setControvercy': True
+            "nextEndpoint": {"urlEndpoint": {"url": f"/watch?v={video_id}"}},
+            "setControvercy": True,
         }
         data.update(self.base_data)
         result = self._call_api(endpoint, self.base_params, data)
@@ -561,9 +597,9 @@ class InnerTube:
 
         This is likely related to captioning for videos, but is currently untested.
         """
-        endpoint = f'{self.base_url}/get_transcript'
+        endpoint = f"{self.base_url}/get_transcript"
         data = {
-            'videoId': video_id,
+            "videoId": video_id,
         }
         data.update(self.base_data)
         result = self._call_api(endpoint, self.base_params, data)

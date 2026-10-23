@@ -6,39 +6,28 @@ combined). This was referred to as ``Video`` in the legacy pyt version, but
 has been renamed to accommodate DASH (which serves the audio and video
 separately).
 """
+
 import os
 import logging
 
 from math import ceil
 from datetime import datetime, timezone
-from typing import (
-    BinaryIO,
-    Dict,
-    Optional,
-    Tuple
-)
+from typing import BinaryIO, Dict, Optional, Tuple
 from urllib.error import HTTPError
 from urllib.parse import parse_qs
 
-from pyt import (
-    extract,
-    request
-)
-from pyt.helpers import (
-    safe_filename,
-    target_directory
-)
+from pyt import extract, request
+from pyt.helpers import safe_filename, target_directory
 from pyt.itags import get_format_profile
 from pyt.monostate import Monostate
 
 logger = logging.getLogger(__name__)
 
+
 class Stream:
     """Container for stream manifest data."""
 
-    def __init__(
-        self, stream: Dict, monostate: Monostate
-    ):
+    def __init__(self, stream: Dict, monostate: Monostate):
         """Construct a :class:`Stream <Stream>`.
 
         :param dict stream:
@@ -52,9 +41,7 @@ class Stream:
         self._monostate = monostate
 
         self.url = stream["url"]  # signed download url
-        self.itag = int(
-            stream["itag"]
-        )  # stream format id (youtube nomenclature)
+        self.itag = int(stream["itag"])  # stream format id (youtube nomenclature)
 
         # set type and codec info
 
@@ -72,27 +59,32 @@ class Stream:
         self.bitrate: Optional[int] = stream["bitrate"]
 
         # filesize in bytes
-        self._filesize: Optional[int] = int(stream.get('contentLength', 0))
-        
+        self._filesize: Optional[int] = int(stream.get("contentLength", 0))
+
         # filesize in kilobytes
-        self._filesize_kb: Optional[float] = float(ceil(float(stream.get('contentLength', 0)) / 1024 * 1000) / 1000)
-        
+        self._filesize_kb: Optional[float] = float(
+            ceil(float(stream.get("contentLength", 0)) / 1024 * 1000) / 1000
+        )
+
         # filesize in megabytes
-        self._filesize_mb: Optional[float] = float(ceil(float(stream.get('contentLength', 0)) / 1024 / 1024 * 1000) / 1000)
-        
+        self._filesize_mb: Optional[float] = float(
+            ceil(float(stream.get("contentLength", 0)) / 1024 / 1024 * 1000) / 1000
+        )
+
         # filesize in gigabytes(fingers crossed we don't need terabytes going forward though)
-        self._filesize_gb: Optional[float] = float(ceil(float(stream.get('contentLength', 0)) / 1024 / 1024 / 1024 * 1000) / 1000)
+        self._filesize_gb: Optional[float] = float(
+            ceil(float(stream.get("contentLength", 0)) / 1024 / 1024 / 1024 * 1000)
+            / 1000
+        )
 
         # Additional information about the stream format, such as resolution,
         # frame rate, and whether the stream is live (HLS) or 3D.
         itag_profile = get_format_profile(self.itag)
         self.is_dash = itag_profile["is_dash"]
         self.abr = itag_profile["abr"]  # average bitrate (audio streams only)
-        if 'fps' in stream:
-            self.fps = stream['fps']  # Video streams only
-        self.resolution = itag_profile[
-            "resolution"
-        ]  # resolution (e.g.: "480p")
+        if "fps" in stream:
+            self.fps = stream["fps"]  # Video streams only
+        self.resolution = itag_profile["resolution"]  # resolution (e.g.: "480p")
         self.is_3d = itag_profile["is_3d"]
         self.is_hdr = itag_profile["is_hdr"]
         self.is_live = itag_profile["is_live"]
@@ -170,7 +162,7 @@ class Stream:
                     raise
                 self._filesize = request.seq_filesize(self.url)
         return self._filesize
-    
+
     @property
     def filesize_kb(self) -> float:
         """File size of the media stream in kilobytes.
@@ -181,13 +173,17 @@ class Stream:
         """
         if self._filesize_kb == 0:
             try:
-                self._filesize_kb = float(ceil(request.filesize(self.url)/1024 * 1000) / 1000)
+                self._filesize_kb = float(
+                    ceil(request.filesize(self.url) / 1024 * 1000) / 1000
+                )
             except HTTPError as e:
                 if e.code != 404:
                     raise
-                self._filesize_kb = float(ceil(request.seq_filesize(self.url)/1024 * 1000) / 1000)
+                self._filesize_kb = float(
+                    ceil(request.seq_filesize(self.url) / 1024 * 1000) / 1000
+                )
         return self._filesize_kb
-    
+
     @property
     def filesize_mb(self) -> float:
         """File size of the media stream in megabytes.
@@ -198,11 +194,15 @@ class Stream:
         """
         if self._filesize_mb == 0:
             try:
-                self._filesize_mb = float(ceil(request.filesize(self.url)/1024/1024 * 1000) / 1000)
+                self._filesize_mb = float(
+                    ceil(request.filesize(self.url) / 1024 / 1024 * 1000) / 1000
+                )
             except HTTPError as e:
                 if e.code != 404:
                     raise
-                self._filesize_mb = float(ceil(request.seq_filesize(self.url)/1024/1024 * 1000) / 1000)
+                self._filesize_mb = float(
+                    ceil(request.seq_filesize(self.url) / 1024 / 1024 * 1000) / 1000
+                )
         return self._filesize_mb
 
     @property
@@ -215,13 +215,18 @@ class Stream:
         """
         if self._filesize_gb == 0:
             try:
-                self._filesize_gb = float(ceil(request.filesize(self.url)/1024/1024/1024 * 1000) / 1000)
+                self._filesize_gb = float(
+                    ceil(request.filesize(self.url) / 1024 / 1024 / 1024 * 1000) / 1000
+                )
             except HTTPError as e:
                 if e.code != 404:
                     raise
-                self._filesize_gb = float(ceil(request.seq_filesize(self.url)/1024/1024/1024 * 1000) / 1000)
+                self._filesize_gb = float(
+                    ceil(request.seq_filesize(self.url) / 1024 / 1024 / 1024 * 1000)
+                    / 1000
+                )
         return self._filesize_gb
-    
+
     @property
     def title(self) -> str:
         """Get title of video
@@ -243,9 +248,7 @@ class Stream:
         """
         if self._monostate.duration and self.bitrate:
             bits_in_byte = 8
-            return int(
-                (self._monostate.duration * self.bitrate) / bits_in_byte
-            )
+            return int((self._monostate.duration * self.bitrate) / bits_in_byte)
 
         return self.filesize
 
@@ -272,7 +275,7 @@ class Stream:
         filename_prefix: Optional[str] = None,
         skip_existing: bool = True,
         timeout: Optional[int] = None,
-        max_retries: Optional[int] = 0
+        max_retries: Optional[int] = 0,
     ) -> str:
         """Write the media stream to disk.
 
@@ -312,22 +315,22 @@ class Stream:
         )
 
         if skip_existing and self.exists_at_path(file_path):
-            logger.debug(f'file {file_path} already exists, skipping')
+            logger.debug(f"file {file_path} already exists, skipping")
             self.on_complete(file_path)
             return file_path
 
-        sabr_url        = self._monostate.sabr_url
-        po_token        = self._monostate.po_token
-        ustreamer_cfg   = self._monostate.ustreamer_config
+        sabr_url = self._monostate.sabr_url
+        po_token = self._monostate.po_token
+        ustreamer_cfg = self._monostate.ustreamer_config
 
         # Use the exact contentLength for progress when available; fall back to
         # the bitrate estimate only for streams where contentLength is missing.
         known_filesize = self.filesize if self._filesize else self.filesize_approx
         bytes_remaining = known_filesize
-        logger.debug(f'downloading ({bytes_remaining} total bytes) file to {file_path}')
+        logger.debug(f"downloading ({bytes_remaining} total bytes) file to {file_path}")
 
-        client_info     = self._monostate.client_info
-        refresh_cb      = self._monostate.refresh_sabr_config
+        client_info = self._monostate.client_info
+        refresh_cb = self._monostate.refresh_sabr_config
 
         with open(file_path, "wb") as fh:
             if sabr_url:
@@ -337,7 +340,7 @@ class Stream:
                         self.itag,
                         ustreamer_config=ustreamer_cfg,
                         po_token=po_token,
-                        is_video=(self.type == 'video'),
+                        is_video=(self.type == "video"),
                         filesize=known_filesize,
                         duration_ms=(self._monostate.duration or 0) * 1000,
                         client_info=client_info,
@@ -347,7 +350,9 @@ class Stream:
                         bytes_remaining = max(0, bytes_remaining - len(chunk))
                         self.on_progress(chunk, fh, bytes_remaining)
                 except Exception as exc:
-                    logger.warning('SABR failed (%s), falling back to range download', exc)
+                    logger.warning(
+                        "SABR failed (%s), falling back to range download", exc
+                    )
                     fh.seek(0)
                     fh.truncate()
                     bytes_remaining = self.filesize
@@ -359,7 +364,7 @@ class Stream:
                     # finish via byte-range from where SABR stopped.
                     sabr_offset = known_filesize - bytes_remaining
                     logger.warning(
-                        'SABR incomplete (%d bytes remaining); finishing with range request',
+                        "SABR incomplete (%d bytes remaining); finishing with range request",
                         bytes_remaining,
                     )
                     try:
@@ -401,9 +406,7 @@ class Stream:
                 bytes_remaining = self.filesize
                 used_seq_stream = True
                 for chunk in request.seq_stream(
-                    self.url,
-                    timeout=timeout,
-                    max_retries=max_retries
+                    self.url, timeout=timeout, max_retries=max_retries
                 ):
                     bytes_remaining -= len(chunk)
                     self.on_progress(chunk, fh, bytes_remaining)
@@ -439,7 +442,8 @@ class Stream:
                 if shortfall > 0:
                     logger.warning(
                         "download finished %d bytes short of expected %d (within tolerance)",
-                        shortfall, self._filesize,
+                        shortfall,
+                        self._filesize,
                     )
         self.on_complete(file_path)
         return file_path
@@ -457,10 +461,7 @@ class Stream:
         return os.path.join(target_directory(output_path), filename)
 
     def exists_at_path(self, file_path: str) -> bool:
-        return (
-            os.path.isfile(file_path)
-            and os.path.getsize(file_path) == self.filesize
-        )
+        return os.path.isfile(file_path) and os.path.getsize(file_path) == self.filesize
 
     def stream_to_buffer(self, buffer: BinaryIO) -> None:
         """Write the media stream to buffer
@@ -469,7 +470,8 @@ class Stream:
         """
         bytes_remaining = self.filesize
         logger.info(
-            "downloading (%s total bytes) file to buffer", self.filesize,
+            "downloading (%s total bytes) file to buffer",
+            self.filesize,
         )
 
         for chunk in request.stream(self.url):
@@ -479,9 +481,7 @@ class Stream:
             self.on_progress(chunk, buffer, bytes_remaining)
         self.on_complete(None)
 
-    def on_progress(
-        self, chunk: bytes, file_handler: BinaryIO, bytes_remaining: int
-    ):
+    def on_progress(self, chunk: bytes, file_handler: BinaryIO, bytes_remaining: int):
         """On progress callback function.
 
         This function writes the binary data to the file, then checks if an
@@ -534,7 +534,10 @@ class Stream:
             parts.extend(['res="{s.resolution}"', 'fps="{s.fps}fps"'])
             if not self.is_adaptive:
                 parts.extend(
-                    ['vcodec="{s.video_codec}"', 'acodec="{s.audio_codec}"',]
+                    [
+                        'vcodec="{s.video_codec}"',
+                        'acodec="{s.audio_codec}"',
+                    ]
                 )
             else:
                 parts.extend(['vcodec="{s.video_codec}"'])

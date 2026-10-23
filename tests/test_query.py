@@ -1,5 +1,7 @@
 """Unit tests for the :class:`StreamQuery <StreamQuery>` class."""
+
 import pytest
+
 
 @pytest.mark.parametrize(
     ("test_input", "expected"),
@@ -57,13 +59,9 @@ def test_order_by(cipher_signature):
     :class:`Stream <Stream>` instances in the expected order.
     """
     itags = [
-        s.itag
-        for s in cipher_signature.streams.filter(type="audio").order_by("itag")
+        s.itag for s in cipher_signature.streams.filter(type="audio").order_by("itag")
     ]
-    expected_itags = [
-        s.itag
-        for s in cipher_signature.streams.filter(type="audio")
-    ]
+    expected_itags = [s.itag for s in cipher_signature.streams.filter(type="audio")]
     expected_itags.sort()
 
     assert itags == expected_itags
@@ -76,14 +74,9 @@ def test_order_by_descending(cipher_signature):
     # numerical values
     itags = [
         s.itag
-        for s in cipher_signature.streams.filter(type="audio")
-        .order_by("itag")
-        .desc()
+        for s in cipher_signature.streams.filter(type="audio").order_by("itag").desc()
     ]
-    expected_itags = [
-        s.itag
-        for s in cipher_signature.streams.filter(type="audio")
-    ]
+    expected_itags = [s.itag for s in cipher_signature.streams.filter(type="audio")]
     expected_itags.sort(reverse=True)
     assert itags == expected_itags
 
@@ -105,23 +98,16 @@ def test_order_by_ascending(cipher_signature):
     # numerical values
     itags = [
         s.itag
-        for s in cipher_signature.streams.filter(type="audio")
-        .order_by("itag")
-        .asc()
+        for s in cipher_signature.streams.filter(type="audio").order_by("itag").asc()
     ]
-    expected_itags = [
-        s.itag
-        for s in cipher_signature.streams.filter(type="audio")
-    ]
+    expected_itags = [s.itag for s in cipher_signature.streams.filter(type="audio")]
     assert itags == expected_itags
 
 
 def test_order_by_non_numerical_ascending(cipher_signature):
     mime_types = [
         s.mime_type
-        for s in cipher_signature.streams.filter(res="360p")
-        .order_by("mime_type")
-        .asc()
+        for s in cipher_signature.streams.filter(res="360p").order_by("mime_type").asc()
     ]
     assert mime_types == ["video/mp4", "video/mp4", "video/mp4", "video/webm"]
 
@@ -136,7 +122,7 @@ def test_order_by_with_none_values(cipher_signature):
         "96kbps",
         "128kbps",
         "160kbps",
-        "192kbps"
+        "192kbps",
     ]
 
 

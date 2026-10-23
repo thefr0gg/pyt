@@ -1,5 +1,6 @@
 """Tests for PO-token providers, JS-runtime detection, and the
 auto-retry path in :class:`Client` / :class:`CombinedDownload`."""
+
 from __future__ import annotations
 
 import subprocess
@@ -11,7 +12,6 @@ import pytest
 
 from pyt.api import _jsruntime, po_token
 from pyt.api.errors import AttestationRequired, ConfigError
-
 
 # ── JS runtime detection ─────────────────────────────────────────────────
 
@@ -29,12 +29,12 @@ def _which_factory(*available):
 
 
 def test_detect_runtime_finds_node():
-    with mock.patch("pyt.api._jsruntime.shutil.which",
-                    side_effect=_which_factory("node")), \
-         mock.patch(
-             "pyt.api._jsruntime.subprocess.run",
-             return_value=mock.Mock(stdout=b"v20.10.0\n", stderr=b""),
-         ):
+    with mock.patch(
+        "pyt.api._jsruntime.shutil.which", side_effect=_which_factory("node")
+    ), mock.patch(
+        "pyt.api._jsruntime.subprocess.run",
+        return_value=mock.Mock(stdout=b"v20.10.0\n", stderr=b""),
+    ):
         rt = _jsruntime.detect_runtime()
     assert rt is not None
     assert rt.name == "node"
@@ -42,24 +42,25 @@ def test_detect_runtime_finds_node():
 
 
 def test_detect_runtime_prefers_node_over_bun():
-    with mock.patch("pyt.api._jsruntime.shutil.which",
-                    side_effect=_which_factory("node", "bun", "deno")), \
-         mock.patch(
-             "pyt.api._jsruntime.subprocess.run",
-             return_value=mock.Mock(stdout=b"v20.0\n", stderr=b""),
-         ):
+    with mock.patch(
+        "pyt.api._jsruntime.shutil.which",
+        side_effect=_which_factory("node", "bun", "deno"),
+    ), mock.patch(
+        "pyt.api._jsruntime.subprocess.run",
+        return_value=mock.Mock(stdout=b"v20.0\n", stderr=b""),
+    ):
         rt = _jsruntime.detect_runtime()
     assert rt is not None
     assert rt.name == "node"
 
 
 def test_detect_runtime_falls_through_to_bun():
-    with mock.patch("pyt.api._jsruntime.shutil.which",
-                    side_effect=_which_factory("bun")), \
-         mock.patch(
-             "pyt.api._jsruntime.subprocess.run",
-             return_value=mock.Mock(stdout=b"1.0.30\n", stderr=b""),
-         ):
+    with mock.patch(
+        "pyt.api._jsruntime.shutil.which", side_effect=_which_factory("bun")
+    ), mock.patch(
+        "pyt.api._jsruntime.subprocess.run",
+        return_value=mock.Mock(stdout=b"1.0.30\n", stderr=b""),
+    ):
         rt = _jsruntime.detect_runtime()
     assert rt is not None
     assert rt.name == "bun"
@@ -75,26 +76,27 @@ def test_detect_runtime_skips_unresponsive_binary():
     """If a binary is on PATH but doesn't respond to --version, we
     keep looking. Some shims claim to be node but are wrappers around
     something else."""
+
     def _run(cmd, **kw):
         if "node" in cmd[0]:
             raise OSError("permission denied")
         return mock.Mock(stdout=b"1.0.0\n", stderr=b"")
 
-    with mock.patch("pyt.api._jsruntime.shutil.which",
-                    side_effect=_which_factory("node", "bun")), \
-         mock.patch("pyt.api._jsruntime.subprocess.run", side_effect=_run):
+    with mock.patch(
+        "pyt.api._jsruntime.shutil.which", side_effect=_which_factory("node", "bun")
+    ), mock.patch("pyt.api._jsruntime.subprocess.run", side_effect=_run):
         rt = _jsruntime.detect_runtime()
     assert rt is not None
     assert rt.name == "bun"
 
 
 def test_detect_all_runtimes_returns_every_present():
-    with mock.patch("pyt.api._jsruntime.shutil.which",
-                    side_effect=_which_factory("node", "deno")), \
-         mock.patch(
-             "pyt.api._jsruntime.subprocess.run",
-             return_value=mock.Mock(stdout=b"x\n", stderr=b""),
-         ):
+    with mock.patch(
+        "pyt.api._jsruntime.shutil.which", side_effect=_which_factory("node", "deno")
+    ), mock.patch(
+        "pyt.api._jsruntime.subprocess.run",
+        return_value=mock.Mock(stdout=b"x\n", stderr=b""),
+    ):
         runtimes = _jsruntime.detect_all_runtimes()
     names = [rt.name for rt in runtimes]
     assert names == ["node", "deno"]  # in preference order
@@ -289,11 +291,12 @@ def test_script_provider_runs_with_detected_runtime(tmp_path):
     script.write_text("console.log('token-from-js')\n")
 
     fake_rt = _jsruntime.JsRuntime(name="node", path="/usr/bin/node", version="v20")
-    with mock.patch("pyt.api.po_token.detect_runtime", return_value=fake_rt), \
-         mock.patch(
-             "pyt.api.po_token.run_script",
-             return_value="token-from-js",
-         ) as rs:
+    with mock.patch(
+        "pyt.api.po_token.detect_runtime", return_value=fake_rt
+    ), mock.patch(
+        "pyt.api.po_token.run_script",
+        return_value="token-from-js",
+    ) as rs:
         token = po_token.ScriptProvider(script).get()
     assert token == "token-from-js"
     rs.assert_called_once()
@@ -403,20 +406,50 @@ def _make_combined_video(cipher_signature, *, video_size=100, audio_size=100):
     from pyt.api.video import Video, _hydrate_meta
 
     pr = cipher_signature._vid_info
-    meta = _hydrate_meta(pr, url=f"https://youtube.com/watch?v={cipher_signature.video_id}")
-    video = Video(player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={})
-    v_raw = _RawStream(itag=136, url="https://ex.com/video", mime_type="video/mp4",
-                       kind="video", subtype="mp4", video_codec="avc1.4d401f",
-                       audio_codec=None, is_adaptive=True, is_progressive=False,
-                       is_otf=False, bitrate=1500000,
-                       filesize=video_size, filesize_approx=video_size,
-                       resolution="720p", fps=30, abr=None, default_filename="v.mp4")
-    a_raw = _RawStream(itag=140, url="https://ex.com/audio", mime_type="audio/mp4",
-                       kind="audio", subtype="mp4", video_codec=None,
-                       audio_codec="mp4a.40.2", is_adaptive=True, is_progressive=False,
-                       is_otf=False, bitrate=128000,
-                       filesize=audio_size, filesize_approx=audio_size,
-                       resolution=None, fps=None, abr="128kbps", default_filename="a.mp4")
+    meta = _hydrate_meta(
+        pr, url=f"https://youtube.com/watch?v={cipher_signature.video_id}"
+    )
+    video = Video(
+        player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={}
+    )
+    v_raw = _RawStream(
+        itag=136,
+        url="https://ex.com/video",
+        mime_type="video/mp4",
+        kind="video",
+        subtype="mp4",
+        video_codec="avc1.4d401f",
+        audio_codec=None,
+        is_adaptive=True,
+        is_progressive=False,
+        is_otf=False,
+        bitrate=1500000,
+        filesize=video_size,
+        filesize_approx=video_size,
+        resolution="720p",
+        fps=30,
+        abr=None,
+        default_filename="v.mp4",
+    )
+    a_raw = _RawStream(
+        itag=140,
+        url="https://ex.com/audio",
+        mime_type="audio/mp4",
+        kind="audio",
+        subtype="mp4",
+        video_codec=None,
+        audio_codec="mp4a.40.2",
+        is_adaptive=True,
+        is_progressive=False,
+        is_otf=False,
+        bitrate=128000,
+        filesize=audio_size,
+        filesize_approx=audio_size,
+        resolution=None,
+        fps=None,
+        abr="128kbps",
+        default_filename="a.mp4",
+    )
     video._streams = StreamSet._from_raw([v_raw, a_raw], video=video)
     video._sabr_config = _SabrConfig()
     return video, video._streams[0], video._streams[1]
@@ -428,11 +461,17 @@ def test_combined_download_translates_attestation_required(cipher_signature, tmp
     from pyt.api import CombinedDownload
     from pyt.sabr.session import SabrAttestationRequired
 
-    video, v_stream, a_stream = _make_combined_video(cipher_signature, video_size=100, audio_size=100)
+    video, v_stream, a_stream = _make_combined_video(
+        cipher_signature, video_size=100, audio_size=100
+    )
 
     plan = CombinedDownload(
-        video=video, video_stream=v_stream, audio_stream=a_stream,
-        output_path=str(tmp_path), filename="out.mkv", container="mkv",
+        video=video,
+        video_stream=v_stream,
+        audio_stream=a_stream,
+        output_path=str(tmp_path),
+        filename="out.mkv",
+        container="mkv",
     )
     video._sabr_config.sabr_url = "https://sabr.example/play"
     video._sabr_config.duration = 10
@@ -453,7 +492,9 @@ def test_combined_download_retries_with_refreshed_po_token(cipher_signature, tmp
     from pyt.api import CombinedDownload
     from pyt.sabr.session import SabrAttestationRequired
 
-    video, v_stream, a_stream = _make_combined_video(cipher_signature, video_size=4, audio_size=4)
+    video, v_stream, a_stream = _make_combined_video(
+        cipher_signature, video_size=4, audio_size=4
+    )
 
     # Stand in for a Client that has a provider.
     fake_client = mock.MagicMock()
@@ -462,8 +503,12 @@ def test_combined_download_retries_with_refreshed_po_token(cipher_signature, tmp
     video._client = fake_client
 
     plan = CombinedDownload(
-        video=video, video_stream=v_stream, audio_stream=a_stream,
-        output_path=str(tmp_path), filename="out.mkv", container="mkv",
+        video=video,
+        video_stream=v_stream,
+        audio_stream=a_stream,
+        output_path=str(tmp_path),
+        filename="out.mkv",
+        container="mkv",
     )
     video._sabr_config.sabr_url = "https://sabr.example/play"
 
@@ -473,10 +518,12 @@ def test_combined_download_retries_with_refreshed_po_token(cipher_signature, tmp
         "PO token required"
     )
     fake_session_2 = mock.MagicMock()
-    fake_session_2.iter_chunks.return_value = iter([
-        (v_stream.itag, b"VVVV"),
-        (a_stream.itag, b"AAAA"),
-    ])
+    fake_session_2.iter_chunks.return_value = iter(
+        [
+            (v_stream.itag, b"VVVV"),
+            (a_stream.itag, b"AAAA"),
+        ]
+    )
     sessions = [fake_session_1, fake_session_2]
 
     def _make_session(*args, **kwargs):
@@ -486,8 +533,9 @@ def test_combined_download_retries_with_refreshed_po_token(cipher_signature, tmp
         Path(output_path).write_bytes(b"merged")
         return Path(output_path)
 
-    with mock.patch("pyt.api.combined.SabrSession", side_effect=_make_session), \
-         mock.patch("pyt.api.combined.run_ffmpeg_merge", side_effect=fake_merge):
+    with mock.patch(
+        "pyt.api.combined.SabrSession", side_effect=_make_session
+    ), mock.patch("pyt.api.combined.run_ffmpeg_merge", side_effect=fake_merge):
         result = plan.run()
 
     fake_client.refresh_po_token.assert_called_once()
@@ -501,19 +549,23 @@ def test_combined_download_propagates_when_no_provider(cipher_signature, tmp_pat
     from pyt.api import CombinedDownload
     from pyt.sabr.session import SabrAttestationRequired
 
-    video, v_stream, a_stream = _make_combined_video(cipher_signature, video_size=4, audio_size=4)
+    video, v_stream, a_stream = _make_combined_video(
+        cipher_signature, video_size=4, audio_size=4
+    )
     # No _client attribute means no provider.
 
     plan = CombinedDownload(
-        video=video, video_stream=v_stream, audio_stream=a_stream,
-        output_path=str(tmp_path), filename="out.mkv", container="mkv",
+        video=video,
+        video_stream=v_stream,
+        audio_stream=a_stream,
+        output_path=str(tmp_path),
+        filename="out.mkv",
+        container="mkv",
     )
     video._sabr_config.sabr_url = "https://sabr.example/play"
 
     fake_session = mock.MagicMock()
-    fake_session.iter_chunks.side_effect = SabrAttestationRequired(
-        "PO token required"
-    )
+    fake_session.iter_chunks.side_effect = SabrAttestationRequired("PO token required")
     with mock.patch("pyt.api.combined.SabrSession", return_value=fake_session):
         with pytest.raises(AttestationRequired):
             plan.run()
@@ -537,7 +589,9 @@ def test_cli_resolves_po_token_cmd():
         return_value=mock.Mock(stdout=b"cmd-generated-token\n", returncode=0),
     ):
         args = mock.MagicMock(
-            po_token=None, po_token_cmd="bgutil-pot", po_token_script=None,
+            po_token=None,
+            po_token_cmd="bgutil-pot",
+            po_token_script=None,
         )
         assert cli._resolve_po_token(args) == "cmd-generated-token"
 
@@ -546,7 +600,9 @@ def test_cli_rejects_multiple_po_token_sources(capsys):
     from pyt import cli
 
     args = mock.MagicMock(
-        po_token="a", po_token_cmd="b", po_token_script=None,
+        po_token="a",
+        po_token_cmd="b",
+        po_token_script=None,
     )
     with pytest.raises(SystemExit) as exit_info:
         cli._resolve_po_token(args)

@@ -4,6 +4,7 @@ These replace the ``vid_info.get('videoDetails', {}).get(...)`` pattern that
 leaks through the legacy :class:`pyt.YouTube` properties. Attribute access
 is pure: no network I/O, no surprise exceptions.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

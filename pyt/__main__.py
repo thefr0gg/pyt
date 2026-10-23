@@ -10,6 +10,7 @@ This is the **legacy** developer interface. New code should use
 here will be moved to :mod:`pyt.legacy` and removed from the top-level
 namespace in a future major release.
 """
+
 import logging
 import re
 import warnings
@@ -17,13 +18,7 @@ import pyt
 import pyt.exceptions as exceptions
 
 from datetime import datetime
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional
-)
+from typing import Any, Callable, Dict, List, Optional
 
 _DEPRECATION_MESSAGE = (
     "pyt.YouTube is deprecated and will be removed in a future major release. "
@@ -48,10 +43,10 @@ logger = logging.getLogger(__name__)
 # Clients tried in order when fetching player data for non-age-restricted videos.
 # ANDROID_VR (version ≤1.65) returns direct signed URLs for all adaptive formats
 # without SABR-only enforcement. Newer ANDROID versions require SABR for many streams.
-_PLAYER_CLIENT_PRIORITY = ['ANDROID_VR', 'ANDROID', 'IOS', 'TV_EMBED']
+_PLAYER_CLIENT_PRIORITY = ["ANDROID_VR", "ANDROID", "IOS", "TV_EMBED"]
 
 # Web-based clients whose version string can be updated from the live page.
-_WEB_CLIENTS = {'WEB', 'WEB_EMBED', 'WEB_MUSIC', 'WEB_CREATOR', 'MWEB', 'TV_EMBED'}
+_WEB_CLIENTS = {"WEB", "WEB_EMBED", "WEB_MUSIC", "WEB_CREATOR", "MWEB", "TV_EMBED"}
 
 
 class YouTube:
@@ -95,7 +90,9 @@ class YouTube:
 
         self._watch_html: Optional[str] = None  # the html of /watch?v=<video_id>
         self._embed_html: Optional[str] = None
-        self._player_config_args: Optional[Dict] = None  # inline js in the html containing
+        self._player_config_args: Optional[Dict] = (
+            None  # inline js in the html containing
+        )
         self._age_restricted: Optional[bool] = None
 
         self._fmt_streams: Optional[List[Stream]] = None
@@ -126,7 +123,7 @@ class YouTube:
         self._po_token = po_token
 
     def __repr__(self):
-        return f'<pyt.__main__.YouTube object: videoId={self.video_id}>'
+        return f"<pyt.__main__.YouTube object: videoId={self.video_id}>"
 
     def __eq__(self, o: object) -> bool:
         # Compare types and urls, if they're same return true, else return false.
@@ -191,17 +188,17 @@ class YouTube:
     @property
     def streaming_data(self):
         """Return streamingData from video info."""
-        if 'streamingData' in self.vid_info:
-            return self.vid_info['streamingData']
+        if "streamingData" in self.vid_info:
+            return self.vid_info["streamingData"]
         self.bypass_age_gate()
-        if 'streamingData' not in self.vid_info:
+        if "streamingData" not in self.vid_info:
             raise exceptions.VideoUnavailable(self.video_id)
-        return self.vid_info['streamingData']
+        return self.vid_info["streamingData"]
 
     @property
     def sabr_url(self) -> Optional[str]:
         """SABR streaming endpoint URL, if present in the player response."""
-        return self.streaming_data.get('serverAbrStreamingUrl')
+        return self.streaming_data.get("serverAbrStreamingUrl")
 
     @property
     def ustreamer_config(self) -> Optional[bytes]:
@@ -213,16 +210,16 @@ class YouTube:
         """
         try:
             raw = (
-                self.vid_info
-                .get('playerConfig', {})
-                .get('mediaCommonConfig', {})
-                .get('mediaUstreamerRequestConfig', {})
-                .get('videoPlaybackUstreamerConfig')
+                self.vid_info.get("playerConfig", {})
+                .get("mediaCommonConfig", {})
+                .get("mediaUstreamerRequestConfig", {})
+                .get("videoPlaybackUstreamerConfig")
             )
             if not raw:
                 return None
             import base64
-            padded = raw + '=' * (-len(raw) % 4)
+
+            padded = raw + "=" * (-len(raw) % 4)
             return base64.urlsafe_b64decode(padded)
         except Exception:
             return None
@@ -257,7 +254,7 @@ class YouTube:
         # build instances of :class:`Stream <Stream>`
         # OTF (on-the-fly) streams have no direct URL and are skipped.
         for stream in stream_manifest:
-            if 'url' not in stream:
+            if "url" not in stream:
                 continue
             video = Stream(
                 stream=stream,
@@ -298,54 +295,56 @@ class YouTube:
         status, messages = extract.playability_status(self.watch_html)
 
         for reason in messages:
-            if status == 'UNPLAYABLE':
+            if status == "UNPLAYABLE":
                 if reason == (
-                    'Join this channel to get access to members-only content '
-                    'like this video, and other exclusive perks.'
+                    "Join this channel to get access to members-only content "
+                    "like this video, and other exclusive perks."
                 ):
                     raise exceptions.MembersOnly(video_id=self.video_id)
-                elif reason == 'This live stream recording is not available.':
+                elif reason == "This live stream recording is not available.":
                     raise exceptions.RecordingUnavailable(video_id=self.video_id)
                 else:
                     raise exceptions.VideoUnavailable(video_id=self.video_id)
-            elif status == 'LOGIN_REQUIRED':
+            elif status == "LOGIN_REQUIRED":
                 if reason == (
-                    'This is a private video. '
-                    'Please sign in to verify that you may see it.'
+                    "This is a private video. "
+                    "Please sign in to verify that you may see it."
                 ):
                     raise exceptions.VideoPrivate(video_id=self.video_id)
-            elif status == 'ERROR':
-                if reason == 'Video unavailable':
+            elif status == "ERROR":
+                if reason == "Video unavailable":
                     raise exceptions.VideoUnavailable(video_id=self.video_id)
-            elif status == 'LIVE_STREAM':
+            elif status == "LIVE_STREAM":
                 raise exceptions.LiveStreamError(video_id=self.video_id)
-    
+
     @staticmethod
-    def _build_client_info(client: str, cfg: dict, visitor_data: Optional[str] = None) -> dict:
+    def _build_client_info(
+        client: str, cfg: dict, visitor_data: Optional[str] = None
+    ) -> dict:
         """Translate an InnerTube client config into the SABR StreamerContext.ClientInfo dict.
 
         Field mapping mirrors yt-dlp's innertube/client_info.py (ClientName enum at 16,
         device_make at 12, device_model at 13, visitor_data at 14, user_agent at 15,
         client_version at 17, os_name at 18, os_version at 19).
         """
-        ctx = (cfg.get('context') or {}).get('client') or {}
-        header = cfg.get('header') or {}
-        client_name_int = header.get('X-Youtube-Client-Name')
+        ctx = (cfg.get("context") or {}).get("client") or {}
+        header = cfg.get("header") or {}
+        client_name_int = header.get("X-Youtube-Client-Name")
         try:
             client_name_int = int(client_name_int) if client_name_int else None
         except (TypeError, ValueError):
             client_name_int = None
         return {
-            'hl':              ctx.get('hl'),
-            'gl':              ctx.get('gl'),
-            'visitor_data':    ctx.get('visitorData') or visitor_data,
-            'client_name':     client_name_int,
-            'client_version':  ctx.get('clientVersion'),
-            'device_make':     ctx.get('deviceMake'),
-            'device_model':    ctx.get('deviceModel'),
-            'os_name':         ctx.get('osName'),
-            'os_version':      ctx.get('osVersion'),
-            'user_agent':      ctx.get('userAgent') or header.get('User-Agent'),
+            "hl": ctx.get("hl"),
+            "gl": ctx.get("gl"),
+            "visitor_data": ctx.get("visitorData") or visitor_data,
+            "client_name": client_name_int,
+            "client_version": ctx.get("clientVersion"),
+            "device_make": ctx.get("deviceMake"),
+            "device_model": ctx.get("deviceModel"),
+            "os_name": ctx.get("osName"),
+            "os_version": ctx.get("osVersion"),
+            "user_agent": ctx.get("userAgent") or header.get("User-Agent"),
         }
 
     @property
@@ -374,7 +373,7 @@ class YouTube:
 
         if self.age_restricted:
             innertube = InnerTube(
-                'ANDROID_EMBED',
+                "ANDROID_EMBED",
                 use_oauth=self.use_oauth,
                 allow_cache=self.allow_oauth_cache,
             )
@@ -401,13 +400,15 @@ class YouTube:
                 )
                 if first_response is None:
                     first_response = response
-                status = response.get('playabilityStatus', {}).get('status')
-                if status == 'OK' and 'streamingData' in response:
+                status = response.get("playabilityStatus", {}).get("status")
+                if status == "OK" and "streamingData" in response:
                     logger.debug("player data from %s client", client)
                     self._vid_info = response
                     cfg = _default_clients.get(client, {})
-                    self.stream_monostate.stream_headers = cfg.get('header', {})
-                    self.stream_monostate.client_info = self._build_client_info(client, cfg, visitor_data)
+                    self.stream_monostate.stream_headers = cfg.get("header", {})
+                    self.stream_monostate.client_info = self._build_client_info(
+                        client, cfg, visitor_data
+                    )
                     return self._vid_info
             except Exception:
                 pass
@@ -415,8 +416,8 @@ class YouTube:
         # Fallback: ytInitialPlayerResponse from the watch page HTML.
         try:
             player_response = extract.initial_player_response(self.watch_html)
-            status = player_response.get('playabilityStatus', {}).get('status')
-            if status == 'OK' and 'streamingData' in player_response:
+            status = player_response.get("playabilityStatus", {}).get("status")
+            if status == "OK" and "streamingData" in player_response:
                 self._vid_info = player_response
                 return self._vid_info
         except exceptions.RegexMatchError:
@@ -427,7 +428,7 @@ class YouTube:
 
     def bypass_age_gate(self):
         """Attempt to update the vid_info by bypassing the age gate."""
-        for client in ('ANDROID_EMBED', 'IOS_EMBED', 'TV_EMBED'):
+        for client in ("ANDROID_EMBED", "IOS_EMBED", "TV_EMBED"):
             try:
                 innertube = InnerTube(
                     client,
@@ -435,8 +436,8 @@ class YouTube:
                     allow_cache=self.allow_oauth_cache,
                 )
                 response = innertube.player(self.video_id)
-                status = response.get('playabilityStatus', {}).get('status')
-                if status not in (None, 'UNPLAYABLE'):
+                status = response.get("playabilityStatus", {}).get("status")
+                if status not in (None, "UNPLAYABLE"):
                     self._vid_info = response
                     return
             except Exception:
@@ -448,6 +449,7 @@ class YouTube:
     def caption_tracks(self):
         """Get a list of :class:`Caption <Caption>`."""
         from pyt.captions import Caption
+
         raw_tracks = (
             self.vid_info.get("captions", {})
             .get("playerCaptionsTracklistRenderer", {})
@@ -459,6 +461,7 @@ class YouTube:
     def captions(self):
         """Interface to query caption tracks."""
         from pyt.query import CaptionQuery
+
         return CaptionQuery(self.caption_tracks)
 
     @property
@@ -477,9 +480,7 @@ class YouTube:
         :rtype: str
         """
         thumbnail_details = (
-            self.vid_info.get("videoDetails", {})
-            .get("thumbnail", {})
-            .get("thumbnails")
+            self.vid_info.get("videoDetails", {}).get("thumbnail", {}).get("thumbnails")
         )
         if thumbnail_details:
             thumbnail_details = thumbnail_details[-1]  # last item has max size
@@ -513,15 +514,15 @@ class YouTube:
             return self._title
 
         try:
-            self._title = self.vid_info['videoDetails']['title']
+            self._title = self.vid_info["videoDetails"]["title"]
         except KeyError:
             # Check_availability will raise the correct exception in most cases
             #  if it doesn't, ask for a report.
             self.check_availability()
             raise exceptions.PytError(
                 (
-                    f'Exception while accessing title of {self.watch_url}. '
-                    'Please file a bug report at https://github.com/pyt/pyt'
+                    f"Exception while accessing title of {self.watch_url}. "
+                    "Please file a bug report at https://github.com/pyt/pyt"
                 )
             )
 
@@ -555,7 +556,7 @@ class YouTube:
 
         :rtype: int
         """
-        return int(self.vid_info.get('videoDetails', {}).get('lengthSeconds'))
+        return int(self.vid_info.get("videoDetails", {}).get("lengthSeconds"))
 
     @property
     def views(self) -> int:
@@ -572,9 +573,7 @@ class YouTube:
         """
         if self._author:
             return self._author
-        self._author = self.vid_info.get("videoDetails", {}).get(
-            "author", "unknown"
-        )
+        self._author = self.vid_info.get("videoDetails", {}).get("author", "unknown")
         return self._author
 
     @author.setter
@@ -588,7 +587,7 @@ class YouTube:
 
         :rtype: List[str]
         """
-        return self.vid_info.get('videoDetails', {}).get('keywords', [])
+        return self.vid_info.get("videoDetails", {}).get("keywords", [])
 
     @property
     def channel_id(self) -> str:
@@ -596,7 +595,7 @@ class YouTube:
 
         :rtype: str
         """
-        return self.vid_info.get('videoDetails', {}).get('channelId', None)
+        return self.vid_info.get("videoDetails", {}).get("channelId", None)
 
     @property
     def channel_url(self) -> str:
@@ -604,7 +603,7 @@ class YouTube:
 
         :rtype: str
         """
-        return f'https://www.youtube.com/channel/{self.channel_id}'
+        return f"https://www.youtube.com/channel/{self.channel_id}"
 
     @property
     def metadata(self) -> Optional[YouTubeMetadata]:

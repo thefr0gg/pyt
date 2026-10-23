@@ -6,6 +6,7 @@ holds the proxy config, cookies, OAuth flag, and PO token, and produces
 (``pyt.__js__``, ``pyt.__js_url__``, ``Monostate``) is still touched
 internally — fully decoupling from it is a v3 task.
 """
+
 from __future__ import annotations
 
 import http.cookiejar
@@ -17,7 +18,6 @@ from typing import Any, Callable, Dict, Optional, Sequence, Union
 from pyt.api.errors import AttestationRequired, ConfigError
 from pyt.api.po_token import PoTokenProvider, coerce_provider
 from pyt.api.video import Video
-
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,10 @@ class Client:
             raise ConfigError(
                 "pass either cookies=<file> or cookies_from_browser=<name>, not both"
             )
-        if cookies_from_browser and cookies_from_browser.lower() not in _BROWSER_CHOICES:
+        if (
+            cookies_from_browser
+            and cookies_from_browser.lower() not in _BROWSER_CHOICES
+        ):
             raise ConfigError(
                 f"unknown browser '{cookies_from_browser}'. "
                 f"choose from: {', '.join(sorted(_BROWSER_CHOICES))}"
@@ -86,7 +89,9 @@ class Client:
         logger.debug(
             "Client init: proxy=%s cookies=%s cookies_from_browser=%s "
             "po_token_provider=%s oauth=%s on_progress=%s on_complete=%s",
-            bool(proxy), bool(cookies), cookies_from_browser,
+            bool(proxy),
+            bool(cookies),
+            cookies_from_browser,
             self._po_token_provider.name if self._po_token_provider else "unset",
             use_oauth,
             "set" if on_progress else "unset",
@@ -134,7 +139,10 @@ class Client:
             length = getattr(result, "length", "?")
             logger.info(
                 "client.video: %s hydrated in %.2fs (title=%r length=%s)",
-                video_id, time.monotonic() - t0, title, length,
+                video_id,
+                time.monotonic() - t0,
+                title,
+                length,
             )
         except Exception:  # noqa: BLE001 — logging must never raise
             pass
@@ -150,7 +158,8 @@ class Client:
             logger.warning(
                 "client: po_token provider '%s' failed (%s); "
                 "falling back to no token",
-                self._po_token_provider.name, exc,
+                self._po_token_provider.name,
+                exc,
             )
             return None
 

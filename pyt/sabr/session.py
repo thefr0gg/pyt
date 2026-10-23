@@ -9,7 +9,13 @@ SABR_REDIRECT, SABR_ERROR, STREAM_PROTECTION_STATUS) and yields demuxed
 
 Replaces the empty-rounds heuristic from the previous SabrClient with explicit
 termination signals from the server.
+
+Pass live=True for a live broadcast: termination then comes from stop() or a
+recognized SABR_ERROR broadcast-end signal instead of a fixed segment count,
+and SABR_SEEK resets buffered-range state to the server-directed position.
+LIVE_METADATA is parsed but not yet acted on - its field layout is unconfirmed.
 """
+
 from __future__ import annotations
 
 import gzip
@@ -26,8 +32,10 @@ from pyt.sabr.ump import (
     UmpParser,
     decode_ump_varint,
     parse_format_init_metadata,
+    parse_live_metadata,
     parse_media_header,
     parse_next_request_policy,
+    parse_reload_player_response,
     parse_sabr_context_sending_policy,
     parse_sabr_context_update,
     parse_sabr_error,
@@ -35,10 +43,12 @@ from pyt.sabr.ump import (
     parse_sabr_seek,
     parse_stream_protection_status,
     UMP_FORMAT_INITIALIZATION_METADATA,
+    UMP_LIVE_METADATA,
     UMP_MEDIA,
     UMP_MEDIA_END,
     UMP_MEDIA_HEADER,
     UMP_NEXT_REQUEST_POLICY,
+    UMP_RELOAD_PLAYER_RESPONSE,
     UMP_SABR_CONTEXT_SENDING_POLICY,
     UMP_SABR_CONTEXT_UPDATE,
     UMP_SABR_ERROR,
@@ -61,6 +71,7 @@ class SabrAttestationRequired(SabrError):
 @dataclass
 class FormatState:
     """Per-itag bookkeeping for the SABR exchange."""
+
     itag: int
     is_video: bool
     expected_bytes: int = 0
@@ -77,6 +88,11 @@ class FormatState:
     finished: bool = False
     # Tracks which header_ids in the current response stream apply to this format.
     active_header_ids: set = field(default_factory=set)
+    # Live-only: no fixed end_segment_index/expected_bytes exists for an open
+    # broadcast, so termination and buffered-range reporting take a different
+    # path (see SabrSession._all_finished / _build_request_body).
+    is_live: bool = False
+    live_window_segments: int = 5
 
 
 @dataclass
@@ -130,7 +146,10 @@ class SabrSession:
         resume: Optional[Dict[int, _ResumeState]] = None,
         max_retries: int = _DEFAULT_MAX_RETRIES,
         timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
-        refresh_callback: Optional[Callable[[], Tuple[Optional[str], Optional[bytes]]]] = None,
+        refresh_callback: Optional[
+            Callable[[], Tuple[Optional[str], Optional[bytes]]]
+        ] = None,
+        live: bool = False,
     ):
         self._sabr_url = sabr_url
         self._ustreamer_config = ustreamer_config
@@ -140,6 +159,9 @@ class SabrSession:
         self._max_retries = max_retries
         self._timeout = timeout
         self._refresh_callback = refresh_callback
+        self._live = live
+        self._stop_requested = False
+        self._broadcast_ended = False
 
         sizes = expected_sizes or {}
         resume = resume or {}
@@ -153,6 +175,7 @@ class SabrSession:
                 expected_duration_ms=duration_ms,
                 downloaded_bytes=r.downloaded_bytes if r else 0,
                 last_segment_index=r.last_segment_index if r else -1,
+                is_live=live,
             )
 
         # Maps an in-flight header_id to the format it belongs to. Lifetime is
@@ -179,13 +202,24 @@ class SabrSession:
 
     # -- Public iteration ------------------------------------------------------
 
+    def stop(self) -> None:
+        """Request a clean stop of a live session after the in-flight round.
+
+        No-op effect on VOD sessions beyond ending early — callers only need
+        this for live downloads, which have no natural end-of-stream."""
+        self._stop_requested = True
+
     def iter_chunks(self) -> Iterator[Tuple[int, bytes]]:
         """Yield (itag, chunk) pairs until every requested format is finished."""
         rn = 0
         url = self._sabr_url
         retries_remaining = self._max_retries
 
-        while not self._all_finished():
+        while not (
+            self._stop_requested
+            or (self._live and self._broadcast_ended)
+            or self._all_finished()
+        ):
             if self._next_backoff_ms > 0:
                 # Honor full backoff during ad enforcement; cap it otherwise.
                 # The server applies readahead-based throttling that can request
@@ -209,7 +243,9 @@ class SabrSession:
                 continue
             except _NeedRefresh:
                 if not self._refresh_callback:
-                    raise SabrError("SABR session expired and no refresh callback was provided")
+                    raise SabrError(
+                        "SABR session expired and no refresh callback was provided"
+                    )
                 new_url, new_cfg = self._refresh_callback()
                 if not new_url:
                     raise SabrError("Refresh callback returned no SABR URL")
@@ -224,9 +260,12 @@ class SabrSession:
                 retries_remaining -= 1
                 backoff = min(
                     _DEFAULT_BACKOFF_CAP,
-                    _DEFAULT_BACKOFF_BASE * (2 ** (self._max_retries - retries_remaining - 1)),
+                    _DEFAULT_BACKOFF_BASE
+                    * (2 ** (self._max_retries - retries_remaining - 1)),
                 )
-                logger.warning("SABR transport error %s; retrying in %.1fs", exc, backoff)
+                logger.warning(
+                    "SABR transport error %s; retrying in %.1fs", exc, backoff
+                )
                 time.sleep(backoff)
                 continue
 
@@ -250,28 +289,41 @@ class SabrSession:
                 audio_itag = fmt.itag
 
         # Buffered ranges advertise what we already have so the server skips it.
+        # Live formats report a sliding window near the edge instead of a
+        # from-zero range — there's no bounded total to advertise, and a
+        # from-zero range would grow unboundedly over a multi-hour broadcast.
         buffered_ranges = []
         for fmt in self._formats.values():
             if fmt.last_segment_index < 0:
                 continue
-            buffered_ranges.append({
-                'itag': fmt.itag,
-                'start_time_ms': 0,
-                'duration_ms': fmt.buffered_end_ms or self._estimate_player_time(fmt),
-                'start_segment_index': 0,
-                'end_segment_index': fmt.last_segment_index,
-            })
+            start_segment_index = (
+                max(0, fmt.last_segment_index - fmt.live_window_segments)
+                if fmt.is_live
+                else 0
+            )
+            buffered_ranges.append(
+                {
+                    "itag": fmt.itag,
+                    "start_time_ms": 0,
+                    "duration_ms": fmt.buffered_end_ms
+                    or self._estimate_player_time(fmt),
+                    "start_segment_index": start_segment_index,
+                    "end_segment_index": fmt.last_segment_index,
+                }
+            )
 
         # Set player_time_ms aggressively forward: report the MIN buffered_end
         # across active formats so the server stops applying readahead-based
         # throttle and just sends us the next chunks. Falls back to the byte-
         # fraction estimate when the server hasn't sent media-time info yet.
+        # Live formats never use the byte-fraction estimate - expected_bytes/
+        # expected_duration_ms don't exist for an open-ended broadcast.
         if active_formats:
             ends = []
             for fmt in active_formats:
                 if fmt.buffered_end_ms:
                     ends.append(fmt.buffered_end_ms)
-                else:
+                elif not fmt.is_live:
                     est = self._estimate_player_time(fmt)
                     if est:
                         ends.append(est)
@@ -304,21 +356,21 @@ class SabrSession:
         )
 
     def _run_round(self, url: str, rn: int, body: bytes) -> Iterator[Tuple[int, bytes]]:
-        sep = '&' if '?' in url else '?'
-        full_url = f'{url}{sep}rn={rn}'
+        sep = "&" if "?" in url else "?"
+        full_url = f"{url}{sep}rn={rn}"
         response = request._execute_request(
             full_url,
-            method='POST',
+            method="POST",
             headers={
-                'Content-Type': 'application/x-protobuf',
-                'Accept': 'application/vnd.yt-ump',
-                'Accept-Encoding': 'gzip',
+                "Content-Type": "application/x-protobuf",
+                "Accept": "application/vnd.yt-ump",
+                "Accept-Encoding": "gzip",
             },
             data=body,
             timeout=self._timeout,
         )
         # urllib does not auto-decompress; wrap if needed.
-        if (response.headers.get('Content-Encoding') or '').lower() == 'gzip':
+        if (response.headers.get("Content-Encoding") or "").lower() == "gzip":
             response = gzip.GzipFile(fileobj=response)
 
         parser = UmpParser()
@@ -354,8 +406,10 @@ class SabrSession:
                 fmt = self._formats[itag]
                 # MEDIA_END for a non-init segment of the final segment_index
                 # means this format is done.
-                if fmt.end_segment_index is not None and \
-                        fmt.last_segment_index >= fmt.end_segment_index:
+                if (
+                    fmt.end_segment_index is not None
+                    and fmt.last_segment_index >= fmt.end_segment_index
+                ):
                     fmt.finished = True
 
             elif part_type == UMP_FORMAT_INITIALIZATION_METADATA:
@@ -363,16 +417,20 @@ class SabrSession:
 
             elif part_type == UMP_NEXT_REQUEST_POLICY:
                 policy = parse_next_request_policy(payload)
-                backoff = policy.get('backoff_time_ms') or 0
+                backoff = policy.get("backoff_time_ms") or 0
                 if backoff:
                     # Ad enforcement / playback-start delay: server is asking us
                     # to wait before the next request. This is a normal SABR
                     # signal, not an error. Resets the stall counter.
                     self._next_backoff_ms = max(self._next_backoff_ms, int(backoff))
                     logger.debug("SABR backoff requested: %d ms", backoff)
-                cookie = policy.get('playback_cookie')
+                cookie = policy.get("playback_cookie")
                 if cookie:
-                    self._playback_cookie = bytes(cookie) if isinstance(cookie, (bytes, bytearray)) else cookie
+                    self._playback_cookie = (
+                        bytes(cookie)
+                        if isinstance(cookie, (bytes, bytearray))
+                        else cookie
+                    )
 
             elif part_type == UMP_STREAM_PROTECTION_STATUS:
                 status = parse_stream_protection_status(payload)
@@ -380,7 +438,7 @@ class SabrSession:
                 #   1 = OK
                 #   2 = ATTESTATION_PENDING
                 #   3 = ATTESTATION_REQUIRED  -> need a valid PO token
-                code = status.get('status')
+                code = status.get("status")
                 if code == 3:
                     raise SabrAttestationRequired(
                         "YouTube requires a valid PO token (STREAM_PROTECTION_STATUS=ATTESTATION_REQUIRED)"
@@ -395,11 +453,18 @@ class SabrSession:
 
             elif part_type == UMP_SABR_ERROR:
                 err = parse_sabr_error(payload)
-                err_type = (err.get('type') or '').lower()
+                err_type = (err.get("type") or "").lower()
                 # yt-dlp treats type containing 'lapsed' or status_code 3 as a
                 # signal to fetch a fresh player response. Other errors abort.
-                if 'lapsed' in err_type or err.get('status_code') == 3:
+                if "lapsed" in err_type or err.get("status_code") == 3:
                     raise _NeedRefresh()
+                if self._live and "ended" in err_type:
+                    # Broadcast-end signal for a live session - exact type
+                    # string unconfirmed against real traffic (tracked as a
+                    # follow-up); treat as clean termination, not a crash.
+                    logger.debug("SABR_ERROR treated as broadcast end: %s", err)
+                    self._broadcast_ended = True
+                    return
                 raise SabrError(
                     f"SABR_ERROR type={err.get('type')!r} action={err.get('action')} "
                     f"status_code={err.get('status_code')} error_type={err.get('error_type')}"
@@ -409,16 +474,36 @@ class SabrSession:
                 self._handle_sabr_context_update(parse_sabr_context_update(payload))
 
             elif part_type == UMP_SABR_CONTEXT_SENDING_POLICY:
-                self._handle_sabr_context_sending_policy(parse_sabr_context_sending_policy(payload))
+                self._handle_sabr_context_sending_policy(
+                    parse_sabr_context_sending_policy(payload)
+                )
 
             elif part_type == UMP_SABR_SEEK:
-                # VOD streams should not see this; for live streams we'd reset
-                # buffered ranges. For now log and continue.
                 seek = parse_sabr_seek(payload)
                 logger.debug("SABR_SEEK %s", seek)
+                self._handle_sabr_seek(seek)
+
+            elif part_type == UMP_LIVE_METADATA:
+                # Field layout unconfirmed - see parse_live_metadata. Inert
+                # for now; just surfaces raw fields for future decoding.
+                logger.debug("LIVE_METADATA %s", parse_live_metadata(payload))
+
+            elif part_type == UMP_RELOAD_PLAYER_RESPONSE:
+                # Server considers the current player response/URLs stale.
+                # Observed on real traffic preceding a stall: continuing to
+                # request against the same SABR/direct URLs after this
+                # fires leads nowhere (and the byte-range fallback 403s on
+                # the now-dead direct URL too). Treat it the same as a
+                # "lapsed" SABR_ERROR - refetch via refresh_callback.
+                logger.debug(
+                    "RELOAD_PLAYER_RESPONSE %s", parse_reload_player_response(payload)
+                )
+                raise _NeedRefresh()
 
             else:
-                logger.debug("SABR unhandled part type=%d len=%d", part_type, len(payload))
+                logger.debug(
+                    "SABR unhandled part type=%d len=%d", part_type, len(payload)
+                )
 
         # Stall accounting: a round with no media is fine if the server told us
         # to back off (ad enforcement, throttling). Otherwise count it; raise
@@ -439,8 +524,8 @@ class SabrSession:
 
     def _handle_media_header(self, payload: bytes) -> None:
         info = parse_media_header(payload)
-        itag = info.get('itag')
-        header_id = info.get('header_id')
+        itag = info.get("itag")
+        header_id = info.get("header_id")
         if itag is None or header_id is None:
             return
         fmt = self._formats.get(itag)
@@ -449,7 +534,7 @@ class SabrSession:
 
         # Per-MEDIA gzip is rare/unused in the wild; yt-dlp also refuses it.
         # We rely on HTTP-level Accept-Encoding: gzip for compression.
-        compression = info.get('compression')
+        compression = info.get("compression")
         if compression and compression != 1:  # 1 = NONE
             raise SabrError(
                 f"MEDIA_HEADER compression={compression} not supported (itag={itag})"
@@ -458,26 +543,26 @@ class SabrSession:
         self._header_to_itag[header_id] = itag
         self._initialized_itags.add(itag)
 
-        if info.get('is_init_seg'):
+        if info.get("is_init_seg"):
             fmt.received_init = True
             return
 
-        seq = info.get('sequence_number')
+        seq = info.get("sequence_number")
         if seq is not None and seq > fmt.last_segment_index:
             fmt.last_segment_index = int(seq)
 
-        if info.get('content_length') and not fmt.expected_bytes:
-            fmt.expected_bytes = int(info['content_length'])
+        if info.get("content_length") and not fmt.expected_bytes:
+            fmt.expected_bytes = int(info["content_length"])
 
-        start_ms = info.get('start_ms') or 0
-        dur_ms = info.get('duration_ms') or 0
+        start_ms = info.get("start_ms") or 0
+        dur_ms = info.get("duration_ms") or 0
         seg_end_ms = int(start_ms) + int(dur_ms)
         if seg_end_ms > fmt.buffered_end_ms:
             fmt.buffered_end_ms = seg_end_ms
 
     def _handle_format_init(self, payload: bytes) -> None:
         info = parse_format_init_metadata(payload)
-        itag = info.get('itag')
+        itag = info.get("itag")
         if itag is None:
             return
         fmt = self._formats.get(itag)
@@ -485,35 +570,55 @@ class SabrSession:
             return
         # `total_segments` is the number of segments in the stream; the last
         # segment number is total_segments (1-indexed in yt-dlp's model).
-        total = info.get('total_segments')
-        if total is not None:
+        total = info.get("total_segments")
+        if total is not None and not fmt.is_live:
+            # A live format has no fixed total; ignore a provisional value
+            # the server might still send so it can't falsely end the loop.
             fmt.end_segment_index = int(total)
 
+    def _handle_sabr_seek(self, seek: dict) -> None:
+        seek_ticks = seek.get("seek_time_ticks")
+        timescale = seek.get("timescale")
+        if seek_ticks is None or not timescale:
+            return
+        seek_ms = int(seek_ticks * 1000 / timescale)
+        for fmt in self._formats.values():
+            if not fmt.is_live:
+                # VOD should not legitimately receive this; don't let an
+                # unexpected seek corrupt an in-progress VOD download.
+                continue
+            fmt.buffered_end_ms = seek_ms
+            fmt.last_segment_index = -1
+
     def _handle_sabr_context_update(self, ctx: dict) -> None:
-        ctype = ctx.get('type')
-        value = ctx.get('value')
-        write_policy = ctx.get('write_policy')
+        ctype = ctx.get("type")
+        value = ctx.get("value")
+        write_policy = ctx.get("write_policy")
         if ctype is None or value is None:
             return
         if write_policy == 2 and ctype in self._sabr_contexts:
             return
-        self._sabr_contexts[ctype] = bytes(value) if isinstance(value, (bytes, bytearray)) else value
-        scope = ctx.get('scope')
+        self._sabr_contexts[ctype] = (
+            bytes(value) if isinstance(value, (bytes, bytearray)) else value
+        )
+        scope = ctx.get("scope")
         if scope is not None:
             self._sabr_context_scopes[ctype] = int(scope)
-        if ctx.get('send_by_default'):
+        if ctx.get("send_by_default"):
             self._contexts_to_send.add(ctype)
         logger.debug(
             "SABR context registered type=%s scope=%s send_by_default=%s",
-            ctype, scope, ctx.get('send_by_default'),
+            ctype,
+            scope,
+            ctx.get("send_by_default"),
         )
 
     def _handle_sabr_context_sending_policy(self, policy: dict) -> None:
-        for t in policy.get('start_policy', []):
+        for t in policy.get("start_policy", []):
             self._contexts_to_send.add(int(t))
-        for t in policy.get('stop_policy', []):
+        for t in policy.get("stop_policy", []):
             self._contexts_to_send.discard(int(t))
-        for t in policy.get('discard_policy', []):
+        for t in policy.get("discard_policy", []):
             self._sabr_contexts.pop(int(t), None)
             self._sabr_context_scopes.pop(int(t), None)
             self._contexts_to_send.discard(int(t))
@@ -531,9 +636,15 @@ class SabrSession:
         for fmt in self._formats.values():
             if fmt.finished:
                 continue
+            if fmt.is_live:
+                # No fixed end exists for an open broadcast; termination is
+                # driven by stop()/_broadcast_ended in iter_chunks instead.
+                return False
             # Reaching the announced end_segment is authoritative.
-            if fmt.end_segment_index is not None \
-                    and fmt.last_segment_index >= fmt.end_segment_index:
+            if (
+                fmt.end_segment_index is not None
+                and fmt.last_segment_index >= fmt.end_segment_index
+            ):
                 fmt.finished = True
                 continue
             # Reaching expected_bytes is authoritative ONLY when we got that

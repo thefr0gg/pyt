@@ -1,4 +1,5 @@
 """Various helper functions implemented by pyt."""
+
 import os
 import re
 import sys
@@ -10,14 +11,7 @@ import warnings
 
 from urllib import request
 
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    TypeVar
-)
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 from pyt.exceptions import RegexMatchError
 
@@ -28,6 +22,7 @@ logger = logging.getLogger(__name__)
 # On Windows, virtual-terminal sequences are activated via the empty os.system
 # call so they work in both Windows Terminal and legacy conhost.
 
+
 def _ansi_enabled() -> bool:
     if sys.stderr.isatty():
         if sys.platform == "win32":
@@ -35,33 +30,36 @@ def _ansi_enabled() -> bool:
         return True
     return False
 
+
 _USE_COLOUR = _ansi_enabled()
+
 
 def _c(code: str) -> str:
     return f"\033[{code}m" if _USE_COLOUR else ""
 
+
 # Named escapes used by the logger formatter
-RESET   = _c("0")
-BOLD    = _c("1")
-DIM     = _c("2")
-CYAN    = _c("36")
-BLUE    = _c("34")
+RESET = _c("0")
+BOLD = _c("1")
+DIM = _c("2")
+CYAN = _c("36")
+BLUE = _c("34")
 MAGENTA = _c("35")
-YELLOW  = _c("33")
-RED     = _c("31")
-BRIGHT_RED    = _c("91")
+YELLOW = _c("33")
+RED = _c("31")
+BRIGHT_RED = _c("91")
 BRIGHT_YELLOW = _c("93")
-BRIGHT_CYAN   = _c("96")
-BRIGHT_WHITE  = _c("97")
+BRIGHT_CYAN = _c("96")
+BRIGHT_WHITE = _c("97")
 
 _STRIP_ANSI = re.compile(r"\033\[[0-9;]*m")
 
 _LEVEL_FMT: Dict[int, tuple] = {
-    logging.DEBUG:    (f"{DIM}{CYAN}",    "DBG"),
-    logging.INFO:     (f"{BLUE}",         "INF"),
-    logging.WARNING:  (f"{BRIGHT_YELLOW}","WRN"),
-    logging.ERROR:    (f"{BRIGHT_RED}",   "ERR"),
-    logging.CRITICAL: (f"{BOLD}{RED}",    "CRT"),
+    logging.DEBUG: (f"{DIM}{CYAN}", "DBG"),
+    logging.INFO: (f"{BLUE}", "INF"),
+    logging.WARNING: (f"{BRIGHT_YELLOW}", "WRN"),
+    logging.ERROR: (f"{BRIGHT_RED}", "ERR"),
+    logging.CRITICAL: (f"{BOLD}{RED}", "CRT"),
 }
 
 
@@ -70,10 +68,10 @@ class _ColourFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         colour, abbrev = _LEVEL_FMT.get(record.levelno, ("", record.levelname[:3]))
-        ts   = self.formatTime(record, "%H:%M:%S")
+        ts = self.formatTime(record, "%H:%M:%S")
         # Shorten "pyt.foo.bar" → "foo.bar" to keep lines tight
         name = record.name.removeprefix("pyt.")
-        msg  = record.getMessage()
+        msg = record.getMessage()
 
         line = (
             f"{DIM}{ts}{RESET}  "
@@ -94,6 +92,7 @@ class _PlainFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         return _STRIP_ANSI.sub("", self._colour.format(record))
 
+
 class DeferredGeneratorList:
     """A wrapper class for deferring list generation.
 
@@ -105,6 +104,7 @@ class DeferredGeneratorList:
     all simultaneously. This should allow for speed improvements for playlist
     and channel interactions.
     """
+
     def __init__(self, generator):
         """Construct a :class:`DeferredGeneratorList <DeferredGeneratorList>`.
 
@@ -124,7 +124,7 @@ class DeferredGeneratorList:
         """Only generate items as they're asked for."""
         # We only allow querying with indexes.
         if not isinstance(key, (int, slice)):
-            raise TypeError('Key must be either a slice or int.')
+            raise TypeError("Key must be either a slice or int.")
 
         # Convert int keys to slice
         key_slice = key
@@ -257,7 +257,9 @@ def safe_filename(s: str, max_length: int = 255) -> str:
     return filename[:max_length].rsplit(" ", 0)[0]
 
 
-def setup_logger(level: int = logging.ERROR, log_filename: Optional[str] = None) -> None:
+def setup_logger(
+    level: int = logging.ERROR, log_filename: Optional[str] = None
+) -> None:
     """Configure the pyt logger.
 
     :param int level:
@@ -286,7 +288,7 @@ GenericType = TypeVar("GenericType")
 
 
 def cache(func: Callable[..., GenericType]) -> GenericType:
-    """ mypy compatible annotation wrapper for lru_cache"""
+    """mypy compatible annotation wrapper for lru_cache"""
     return functools.lru_cache()(func)  # type: ignore
 
 
@@ -367,12 +369,12 @@ def generate_all_html_json_mocks():
     This should automatically output to the test/mocks directory.
     """
     test_vid_ids = [
-        '2lAe1cqCOXo',
-        '5YceQ8YqYMc',
-        'irauhITDrsE',
-        'm8uHb5jIGN8',
-        'QRS8MkLhQmM',
-        'WXxV9g7lsFE'
+        "2lAe1cqCOXo",
+        "5YceQ8YqYMc",
+        "irauhITDrsE",
+        "m8uHb5jIGN8",
+        "QRS8MkLhQmM",
+        "WXxV9g7lsFE",
     ]
     for vid_id in test_vid_ids:
         create_mock_html_json(vid_id)
@@ -389,31 +391,29 @@ def create_mock_html_json(vid_id) -> Dict[str, Any]:
     """
     import warnings
     from pyt.__main__ import YouTube
-    gzip_filename = 'yt-video-%s-html.json.gz' % vid_id
+
+    gzip_filename = "yt-video-%s-html.json.gz" % vid_id
 
     # Get the pyt directory in order to navigate to /tests/mocks
     pyt_dir_path = os.path.abspath(
-        os.path.join(
-            os.path.dirname(__file__),
-            os.path.pardir
-        )
+        os.path.join(os.path.dirname(__file__), os.path.pardir)
     )
-    pyt_mocks_path = os.path.join(pyt_dir_path, 'tests', 'mocks')
+    pyt_mocks_path = os.path.join(pyt_dir_path, "tests", "mocks")
     gzip_filepath = os.path.join(pyt_mocks_path, gzip_filename)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
-        yt = YouTube(f'https://www.youtube.com/watch?v={vid_id}')
+        yt = YouTube(f"https://www.youtube.com/watch?v={vid_id}")
     html_data = {
-        'url': yt.watch_url,
-        'js': yt.js,
-        'embed_html': yt.embed_html,
-        'watch_html': yt.watch_html,
-        'vid_info': yt.vid_info
+        "url": yt.watch_url,
+        "js": yt.js,
+        "embed_html": yt.embed_html,
+        "watch_html": yt.watch_html,
+        "vid_info": yt.vid_info,
     }
 
-    logger.info(f'Outputing json.gz file to {gzip_filepath}')
-    with gzip.open(gzip_filepath, 'wb') as f:
-        f.write(json.dumps(html_data).encode('utf-8'))
+    logger.info(f"Outputing json.gz file to {gzip_filepath}")
+    with gzip.open(gzip_filepath, "wb") as f:
+        f.write(json.dumps(html_data).encode("utf-8"))
 
     return html_data

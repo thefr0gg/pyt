@@ -17,6 +17,7 @@ The detection result is cached at module level so repeated lookups
 during a single process are free. ``invalidate()`` is provided for
 tests that mock ``shutil.which``.
 """
+
 from __future__ import annotations
 
 import logging
@@ -25,7 +26,6 @@ import subprocess  # nosec — argv constructed by us
 import sys
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
-
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +45,9 @@ _KNOWN_RUNTIMES: Tuple[Tuple[str, str], ...] = (
 class JsRuntime:
     """A detected JavaScript runtime."""
 
-    name: str           # "node" / "bun" / "deno"
-    path: str           # absolute path
-    version: str        # raw stdout from --version
+    name: str  # "node" / "bun" / "deno"
+    path: str  # absolute path
+    version: str  # raw stdout from --version
 
 
 _cached: Optional[JsRuntime] = None

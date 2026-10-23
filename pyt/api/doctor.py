@@ -25,6 +25,7 @@ Auto-install always:
 If verification fails, the install is rolled back and the user gets
 a clear error.
 """
+
 from __future__ import annotations
 
 import logging
@@ -76,7 +77,7 @@ class Tool:
     """A binary the doctor checks for."""
 
     name: str
-    binary: str            # what to look up via shutil.which
+    binary: str  # what to look up via shutil.which
     description: str
     required_for: List[str]
     install_url: Optional[str]
@@ -103,14 +104,24 @@ def known_tools() -> List[Tool]:
             name="ffmpeg",
             binary="ffmpeg",
             description="muxing, audio extraction, post-processing, upscale re-encode",
-            required_for=["merge", "extract_audio", "embed_*", "sponsorblock_remove", "upscale"],
+            required_for=[
+                "merge",
+                "extract_audio",
+                "embed_*",
+                "sponsorblock_remove",
+                "upscale",
+            ],
             install_url="https://ffmpeg.org/download.html",
         ),
         Tool(
             name="ffprobe",
             binary="ffprobe",
             description="duration / fps / audio detection (ships with ffmpeg)",
-            required_for=["merge validation", "upscale chunking", "upscale fps detection"],
+            required_for=[
+                "merge validation",
+                "upscale chunking",
+                "upscale fps detection",
+            ],
             install_url="https://ffmpeg.org/download.html",
             # ffprobe always ships in the same archive as ffmpeg; the doctor
             # treats them as one install.
@@ -215,8 +226,9 @@ def _get_version(path: str, version_flag: str) -> Optional[str]:
         )
     except (OSError, subprocess.SubprocessError):
         return None
-    text = (result.stdout or b"").decode("utf-8", errors="replace") \
-        + (result.stderr or b"").decode("utf-8", errors="replace")
+    text = (result.stdout or b"").decode("utf-8", errors="replace") + (
+        result.stderr or b""
+    ).decode("utf-8", errors="replace")
     for line in text.splitlines():
         line = line.strip()
         if line:
@@ -232,9 +244,7 @@ def feature_status(tools: List[Tool]) -> List[Feature]:
     have = lambda n: by_name.get(n) is not None and by_name[n].found  # noqa: E731
     have_any_js_runtime = have("node") or have("bun") or have("deno")
     have_any_po_token_tool = (
-        have("pyt-po-token")
-        or have("bgutil-pot")
-        or have_any_js_runtime
+        have("pyt-po-token") or have("bgutil-pot") or have_any_js_runtime
     )
 
     return [
@@ -252,7 +262,11 @@ def feature_status(tools: List[Tool]) -> List[Feature]:
             name="Combined video+audio merge (CombinedDownload)",
             available=have("ffmpeg"),
             requires=["ffmpeg"],
-            note="ffprobe also enables post-merge duration validation" if not have("ffprobe") else "",
+            note=(
+                "ffprobe also enables post-merge duration validation"
+                if not have("ffprobe")
+                else ""
+            ),
         ),
         Feature(
             name="Metadata / thumbnail / subtitle embedding",
@@ -282,7 +296,8 @@ def feature_status(tools: List[Tool]) -> List[Feature]:
                 "Without a generator, you can still pass a static PO "
                 "token via --po-token <TOKEN> (extract from your "
                 "browser's DevTools)."
-                if not have_any_po_token_tool else ""
+                if not have_any_po_token_tool
+                else ""
             ),
         ),
     ]
@@ -303,9 +318,9 @@ class InstallPlan:
 
     tool: str
     url: str
-    archive_format: str   # "zip" or "tar.xz"
+    archive_format: str  # "zip" or "tar.xz"
     target_dir: Path
-    binary_name: str       # what ends up on PATH
+    binary_name: str  # what ends up on PATH
     extra_files: List[str] = field(default_factory=list)
     # When True, copy all sibling files from the binary's archive directory
     # (e.g. DLLs that must live next to the exe on Windows).
@@ -551,7 +566,10 @@ def _install_po_token_generator(
     # 2. Verify Node 18+ (we need global fetch).
     try:
         result = subprocess.run(  # nosec
-            [node_path, "--version"], capture_output=True, check=True, timeout=10,
+            [node_path, "--version"],
+            capture_output=True,
+            check=True,
+            timeout=10,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         raise InstallError(f"could not run {node_path} --version: {exc}") from exc
@@ -574,15 +592,23 @@ def _install_po_token_generator(
         '  "private": true,\n'
         '  "version": "0.0.0",\n'
         '  "description": "vendored deps for pyt po-token launcher"\n'
-        '}\n',
+        "}\n",
         encoding="utf-8",
     )
 
     # 4. npm install. We pipe stdout/stderr through to the parent so
     # the user sees what's happening (npm is chatty about download
     # progress, and a silent install of 200+ files would feel hung).
-    cmd = [npm_path, "install", "--no-audit", "--no-fund", "--no-progress",
-           "--prefix", str(js_dir), *_POT_NPM_PACKAGES]
+    cmd = [
+        npm_path,
+        "install",
+        "--no-audit",
+        "--no-fund",
+        "--no-progress",
+        "--prefix",
+        str(js_dir),
+        *_POT_NPM_PACKAGES,
+    ]
     logger.info("doctor: running %s", " ".join(cmd))
     try:
         subprocess.run(  # nosec — argv constructed by us
@@ -716,9 +742,7 @@ def _plan_realesrgan() -> InstallPlan:
         zip_name = f"realesrgan-ncnn-vulkan-{_REALESRGAN_RELEASE_DATE}-ubuntu.zip"
         binary = "realesrgan-ncnn-vulkan"
     else:
-        raise InstallError(
-            f"realesrgan auto-install: unsupported platform {sysname!r}"
-        )
+        raise InstallError(f"realesrgan auto-install: unsupported platform {sysname!r}")
     return InstallPlan(
         tool="realesrgan",
         url=f"{_REALESRGAN_BASE_URL}/{zip_name}",
@@ -798,7 +822,9 @@ def render_status(tools: List[Tool], features: List[Feature]) -> str:
     """
     out: List[str] = []
     sysname, arch = _platform_key()
-    out.append(f"pyt doctor - {sysname}/{arch}, python {sys.version_info.major}.{sys.version_info.minor}")
+    out.append(
+        f"pyt doctor - {sysname}/{arch}, python {sys.version_info.major}.{sys.version_info.minor}"
+    )
     out.append(f"Managed bin dir: {pyt_bin_dir()}")
     out.append("")
 
@@ -847,9 +873,9 @@ def _is_present(tools: List[Tool], name: str) -> bool:
 
 _MANUAL_INSTALL_HINTS = {
     "ffprobe": "  (ships with ffmpeg)",
-    "node":   "  (install: https://nodejs.org)",
-    "bun":    "  (install: https://bun.sh)",
-    "deno":   "  (install: https://deno.com)",
+    "node": "  (install: https://nodejs.org)",
+    "bun": "  (install: https://bun.sh)",
+    "deno": "  (install: https://deno.com)",
     "bgutil-pot": "  (install: https://github.com/Brainicism/bgutil-ytdlp-pot-provider)",
 }
 

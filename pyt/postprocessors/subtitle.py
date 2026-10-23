@@ -1,4 +1,5 @@
 """Subtitle embedding post-processor."""
+
 from __future__ import annotations
 
 import os
@@ -62,14 +63,21 @@ class EmbedSubtitlePostProcessor(FFmpegPostProcessor):
                 f.write(caption.generate_srt_captions())
 
             tmp = self._temp_path(file_path, ext)
-            self._run_ffmpeg([
-                "-i", file_path,
-                "-i", srt_path,
-                "-c", "copy",
-                "-c:s", sub_codec,
-                "-metadata:s:s:0", f"language={self._lang_code}",
-                tmp,
-            ])
+            self._run_ffmpeg(
+                [
+                    "-i",
+                    file_path,
+                    "-i",
+                    srt_path,
+                    "-c",
+                    "copy",
+                    "-c:s",
+                    sub_codec,
+                    "-metadata:s:s:0",
+                    f"language={self._lang_code}",
+                    tmp,
+                ]
+            )
             return self._replace_file(tmp, file_path)
         finally:
             if os.path.exists(srt_path):
