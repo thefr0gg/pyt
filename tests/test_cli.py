@@ -664,18 +664,19 @@ def test_perform_args_marks_archive_after_download(download):
 
 
 @mock.patch("pyt.cli._download")
-def test_perform_args_applies_output_template(download):
+def test_perform_args_applies_output_template(download, tmp_path):
     video = _catalog()
     video.author.name = "Chan"
     video.author.id = "UC1"
     video.published_at = None
     template = cli.OutputTemplate("{author}/{title}.{ext}")
+    base = str(tmp_path / "base")
     cli._perform_args_on_video(
-        video, _argv("--itag=140", "-t", "base"), template=template
+        video, _argv("--itag=140", "-t", base), template=template
     )
     kwargs = download.call_args.kwargs
     assert kwargs["filename"] == "A Title.mp4"
-    assert kwargs["target"] == os.path.join("base", "Chan")
+    assert kwargs["target"] == os.path.join(base, "Chan")
 
 
 @patch("pyt.cli.dump_json")
