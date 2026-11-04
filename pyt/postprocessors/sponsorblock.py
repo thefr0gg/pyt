@@ -13,8 +13,8 @@ from typing import List, Optional, TYPE_CHECKING
 from pyt.postprocessors.ffmpeg import FFmpegPostProcessor, PostProcessorError
 
 if TYPE_CHECKING:
-    from pyt.streams import Stream
-    from pyt.__main__ import YouTube
+    from pyt.api.streams import StreamRef
+    from pyt.api.video import Video
 
 logger = logging.getLogger(__name__)
 
@@ -92,14 +92,14 @@ class SponsorBlockPP(FFmpegPostProcessor):
         self._mode = mode
         self._categories = categories if categories is not None else ["sponsor"]
 
-    def run(self, file_path: str, stream: "Stream", youtube: "YouTube") -> str:
-        segments = _fetch_segments(youtube.video_id, self._categories)
+    def run(self, file_path: str, stream: "StreamRef", video: "Video") -> str:
+        segments = _fetch_segments(video.video_id, self._categories)
         if not segments:
-            logger.info("No SponsorBlock segments found for %s", youtube.video_id)
+            logger.info("No SponsorBlock segments found for %s", video.video_id)
             return file_path
 
         logger.info(
-            "Found %d SponsorBlock segment(s) for %s", len(segments), youtube.video_id
+            "Found %d SponsorBlock segment(s) for %s", len(segments), video.video_id
         )
         if self._mode == "mark":
             return self._mark(file_path, segments)

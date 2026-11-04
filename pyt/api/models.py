@@ -1,7 +1,7 @@
 """Typed, frozen dataclasses returned by the modern API.
 
 These replace the ``vid_info.get('videoDetails', {}).get(...)`` pattern that
-leaks through the legacy :class:`pyt.YouTube` properties. Attribute access
+leaked through the pytube-era ``YouTube`` properties. Attribute access
 is pure: no network I/O, no surprise exceptions.
 """
 

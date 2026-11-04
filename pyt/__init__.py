@@ -1,25 +1,16 @@
 """pyt — YouTube downloader for Python 3.
 
-v3: the legacy pytube API has been removed from the top-level namespace.
-Legacy symbols (YouTube, Stream, Caption, Playlist, etc.) are still
-importable from ``pyt.legacy`` through this release cycle:
-
-    from pyt.legacy import YouTube, Playlist, Channel, Search
-
-They emit a ``DeprecationWarning`` and will be removed in v4.
+v3: the pytube-era API (``YouTube``, ``Stream``, ``Playlist``, ``Channel``,
+``Search``) is gone. ``pyt.Client`` is the only entry point.
 """
 
 __title__ = "pyt"
 __author__ = "ramsy0dev"
 __license__ = "MIT"
 
-# Module-level JS cache — used internally by pyt._legacy_archive.YouTube.
-__js__ = None
-__js_url__ = None
-
 from pyt.version import __version__
 
-# Modern API — the only public surface in v3.
+# Public API.
 from pyt.api import (
     Client,
     Video,

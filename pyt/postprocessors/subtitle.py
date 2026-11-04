@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING
 from pyt.postprocessors.ffmpeg import FFmpegPostProcessor
 
 if TYPE_CHECKING:
-    from pyt.streams import Stream
-    from pyt.__main__ import YouTube
+    from pyt.api.streams import StreamRef
+    from pyt.api.video import Video
 
 logger = logging.getLogger(__name__)
 
@@ -38,17 +38,17 @@ class EmbedSubtitlePostProcessor(FFmpegPostProcessor):
         super().__init__()
         self._lang_code = lang_code
 
-    def run(self, file_path: str, stream: "Stream", youtube: "YouTube") -> str:
+    def run(self, file_path: str, stream: "StreamRef", video: "Video") -> str:
         ext = os.path.splitext(file_path)[1].lower()
         sub_codec = _SUB_CODEC.get(ext)
         if not sub_codec:
             logger.warning("Subtitle embedding not supported for %s", ext)
             return file_path
 
-        caption = youtube.captions.get(self._lang_code)
+        caption = video.captions.get(self._lang_code)
         if caption is None:
             # Try auto-generated variant (prefix "a.")
-            caption = youtube.captions.get(f"a.{self._lang_code}")
+            caption = video.captions.get(f"a.{self._lang_code}")
         if caption is None:
             logger.warning(
                 "No caption found for language '%s'; skipping subtitle embedding",

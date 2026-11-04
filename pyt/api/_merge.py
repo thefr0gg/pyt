@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from pyt.api.streams import StreamRef
-    from pyt.streams import Stream as _LegacyStream
 
 
 logger = logging.getLogger(__name__)
@@ -82,8 +81,8 @@ def pick_merge_container(video_codec: Optional[str], audio_codec: Optional[str])
 
 
 def pick_merge_container_for_streams(video, audio) -> str:
-    """Convenience wrapper accepting either modern :class:`StreamRef` or
-    legacy :class:`pyt.Stream` instances.
+    """Convenience wrapper accepting a :class:`StreamRef` or any object with
+    ``video_codec`` / ``audio_codec`` attributes.
     """
     return pick_merge_container(
         getattr(video, "video_codec", None),

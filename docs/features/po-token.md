@@ -173,8 +173,8 @@ SABR) hits `ATTESTATION_REQUIRED`:
    `AttestationRequired` at the API boundary.
 2. If the parent `Client` has a provider configured, we ask it to
    refresh the token (`provider.invalidate()` + `provider.get(force_refresh=True)`).
-3. The legacy `Monostate.po_token` is updated in-place so the next
-   SABR session picks up the new token.
+3. The new token is written to the video's SABR config so the next
+   SABR session picks it up.
 4. The part files are reset (truncated + reopened) and the SABR
    exchange runs once more.
 5. If the second attempt also fails, the error propagates.
@@ -245,8 +245,7 @@ token, so users hitting it for the first time get inline guidance.
   the error propagates so the user can investigate (perhaps the
   generator is broken, the npm install needs updating, or the video
   is genuinely gated beyond what a token can unlock).
-- **The legacy `Stream.download` path doesn't auto-retry.** Only the
-  modern `CombinedDownload` does. The CLI's `pyt <url>` command runs
+- **Only `CombinedDownload` auto-retries.** The CLI's `pyt <url>` command runs
   the generator once at startup and passes the result as a static
   token; if it expires mid-download, re-run.
 - **The bundled generator is best-effort.** It uses two pure-JS

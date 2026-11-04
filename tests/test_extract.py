@@ -15,24 +15,6 @@ def test_extract_video_id():
     assert video_id == "2lAe1cqCOXo"
 
 
-def test_info_url(age_restricted):
-    video_info_url = extract.video_info_url_age_restricted(
-        video_id="QRS8MkLhQmM",
-        embed_html=age_restricted["embed_html"],
-    )
-    assert video_info_url.startswith("https://www.youtube.com/get_video_info")
-    assert "video_id=QRS8MkLhQmM" in video_info_url
-
-
-def test_info_url_age_restricted(cipher_signature):
-    video_info_url = extract.video_info_url(
-        video_id=cipher_signature.video_id,
-        watch_url=cipher_signature.watch_url,
-    )
-    assert video_info_url.startswith("https://www.youtube.com/get_video_info")
-    assert "video_id=2lAe1cqCOXo" in video_info_url
-
-
 def test_js_url(cipher_signature):
     expected = r"https://youtube.com/s/player/([\w\d]+)/player_ias.vflset/en_US/base.js"
     result = extract.js_url(cipher_signature.watch_html)
@@ -48,26 +30,10 @@ def test_non_age_restricted(cipher_signature):
     assert not extract.is_age_restricted(cipher_signature.watch_html)
 
 
-def test_is_private(private):
-    assert extract.is_private(private["watch_html"])
-
-
-def test_not_is_private(cipher_signature):
-    assert not extract.is_private(cipher_signature.watch_html)
-
-
-def test_recording_available(cipher_signature):
-    assert extract.recording_available(cipher_signature.watch_html)
-
-
 def test_publish_date(cipher_signature):
     expected = datetime(2019, 12, 5)
     assert cipher_signature.publish_date == expected
     assert extract.publish_date("") is None
-
-
-def test_not_recording_available(missing_recording):
-    assert not extract.recording_available(missing_recording["watch_html"])
 
 
 def test_mime_type_codec():

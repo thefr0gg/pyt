@@ -7,8 +7,8 @@ import re
 from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pyt.streams import Stream
-    from pyt.__main__ import YouTube
+    from pyt.api.streams import StreamRef
+    from pyt.api.video import Video
 
 # Characters illegal in filenames on Windows/macOS/Linux
 _UNSAFE = re.compile(r'[\\/:*?"<>|]')
@@ -42,7 +42,7 @@ class OutputTemplate:
     Example
     -------
     >>> t = OutputTemplate("{author} - {title}.{ext}")
-    >>> t.render(youtube, stream)
+    >>> t.render(video, stream)
     'Rick Astley - Never Gonna Give You Up.mp4'
     """
 
@@ -51,12 +51,12 @@ class OutputTemplate:
 
     def render(
         self,
-        youtube: "YouTube",
-        stream: "Stream",
+        video: "Video",
+        stream: "StreamRef",
         playlist_index: Optional[int] = None,
         playlist_title: Optional[str] = None,
     ) -> str:
-        fields = self._collect(youtube, stream, playlist_index, playlist_title)
+        fields = self._collect(video, stream, playlist_index, playlist_title)
 
         def _replace(m: re.Match) -> str:
             key = m.group(1)
@@ -78,8 +78,8 @@ class OutputTemplate:
 
     @staticmethod
     def _collect(
-        youtube: "YouTube",
-        stream: "Stream",
+        video: "Video",
+        stream: "StreamRef",
         playlist_index: Optional[int],
         playlist_title: Optional[str],
     ) -> dict:
@@ -93,12 +93,12 @@ class OutputTemplate:
             except Exception:
                 pass
 
-        _try("title", lambda: youtube.title)
-        _try("id", lambda: youtube.video_id)
-        _try("author", lambda: youtube.author)
-        _try("channel_id", lambda: youtube.channel_id)
+        _try("title", lambda: video.title)
+        _try("id", lambda: video.video_id)
+        _try("author", lambda: video.author.name)
+        _try("channel_id", lambda: video.author.id)
         _try(
-            "upload_date", lambda: youtube.publish_date
+            "upload_date", lambda: video.published_at
         )  # datetime object; formatted in _replace
         _try("ext", lambda: stream.subtype)
         _try("resolution", lambda: stream.resolution)

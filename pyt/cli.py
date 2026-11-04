@@ -5,30 +5,21 @@ import os
 import sys
 import json
 import gzip
-import math
 import shutil
 import logging
 import argparse
-import subprocess  # nosec
 import time
 import random
-import warnings
 import datetime as dt
-from pathlib import Path
-import pyt.exceptions as exceptions
-from urllib.error import HTTPError
-
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pyt import __version__
-from pyt.__main__ import YouTube
-from pyt.query import CaptionQuery
-from pyt.streams import Stream
-from pyt.contrib.playlist import Playlist
-from pyt.contrib.channel import Channel
+from pyt.api import Client, CombinedDownload, DownloadError, PytError, StreamRef, Video
+from pyt.api.streams import _resolution_to_int
 from pyt.archive import DownloadArchive
+from pyt.captions import Caption
 from pyt.config import apply_config, load_config
-from pyt.helpers import setup_logger, safe_filename
+from pyt.helpers import safe_filename, setup_logger, target_directory
 from pyt.postprocessors import (
     AudioExtractor,
     EmbedSubtitlePostProcessor,
@@ -38,7 +29,7 @@ from pyt.postprocessors import (
     SponsorBlockPP,
 )
 from pyt.postprocessors.sponsorblock import ALL_CATEGORIES
-from pyt.template import DEFAULT_TEMPLATE, OutputTemplate
+from pyt.template import OutputTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -96,11 +87,12 @@ def _fmt_bytes(n: int) -> str:
     """Human-readable byte count."""
     if n < 1024:
         return f"{n} B"
+    size = float(n)
     for unit in ("KB", "MB", "GB"):
-        n /= 1024
-        if n < 1024:
-            return f"{n:.1f} {unit}"
-    return f"{n:.1f} TB"
+        size /= 1024
+        if size < 1024:
+            return f"{size:.1f} {unit}"
+    return f"{size:.1f} TB"
 
 
 def _fmt_seconds(secs: float) -> str:
@@ -129,6 +121,28 @@ _BAR_FULL = "━"  # ━
 _BAR_EMPTY = "━"  # ━ (dimmed)
 
 
+def _bar_glyphs() -> tuple:
+    """Bar characters the current stdout can encode.
+
+    A redirected stdout on Windows defaults to the ANSI code page (cp1252),
+    which has no box-drawing characters; writing ``━`` there raises
+    ``UnicodeEncodeError`` and aborts the download.
+    """
+    try:
+        _BAR_FULL.encode(sys.stdout.encoding or "ascii")
+    except (UnicodeEncodeError, LookupError):
+        return "#", "-"
+    return _BAR_FULL, _BAR_EMPTY
+
+
+def _make_stdout_safe() -> None:
+    """Never let an unencodable character (— · … ━) crash the CLI."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(errors="replace")
+
+
 def _clear_progress_line() -> None:
     cols = shutil.get_terminal_size().columns
     sys.stdout.write(f"\r{' ' * cols}\r")
@@ -140,7 +154,8 @@ def _draw_progress(bytes_recv: int, filesize: int, speed: float, eta: float) -> 
     filled = int(_BAR_WIDTH * pct)
     empty = _BAR_WIDTH - filled
 
-    bar = f"{BGN}{_BAR_FULL * filled}{R}{DM}{_BAR_EMPTY * empty}{R}"
+    full, blank = _bar_glyphs()
+    bar = f"{BGN}{full * filled}{R}{DM}{blank * empty}{R}"
     size_str = f"{_fmt_bytes(bytes_recv)}/{_fmt_bytes(filesize)}"
     spd_str = f"{_fmt_bytes(int(speed))}/s" if speed > 0 else ""
     eta_str = f"eta {_fmt_seconds(eta)}" if eta > 0 and pct < 1 else ""
@@ -152,12 +167,16 @@ def _draw_progress(bytes_recv: int, filesize: int, speed: float, eta: float) -> 
     sys.stdout.flush()
 
 
-def on_progress(stream: Stream, chunk: bytes, bytes_remaining: int) -> None:
-    filesize = stream.filesize
-    bytes_recv = filesize - bytes_remaining
+def on_progress(stream: StreamRef, chunk: bytes, bytes_remaining: int) -> None:
+    filesize = stream.filesize or stream.filesize_approx
+    bytes_recv = max(0, filesize - bytes_remaining)
     now = time.monotonic()
 
-    if not _DL_STATE:
+    # A merged download streams two formats through the same callback; start
+    # the speed/ETA clock over whenever the stream changes.
+    if _DL_STATE.get("itag") != stream.itag:
+        _DL_STATE.clear()
+        _DL_STATE["itag"] = stream.itag
         _DL_STATE["start"] = now
 
     elapsed = now - _DL_STATE["start"]
@@ -170,13 +189,13 @@ def on_progress(stream: Stream, chunk: bytes, bytes_remaining: int) -> None:
 # ── Stream table ──────────────────────────────────────────────────────────────
 
 
-def display_streams(youtube: YouTube) -> None:
-    streams = list(youtube.streams)
+def display_streams(video: Video) -> None:
+    streams = list(video.streams)
     if not streams:
         _print_warn("No streams found.")
         return
 
-    _print_section(f"Available streams — {youtube.title}")
+    _print_section(f"Available streams — {video.title}")
 
     col_itag = 6
     col_type = 14
@@ -198,10 +217,10 @@ def display_streams(youtube: YouTube) -> None:
     sys.stdout.write(f"\n{header}\n{sep}\n")
 
     for s in streams:
-        if s.includes_audio_track and s.includes_video_track:
+        if s.is_progressive:
             kind = "progressive"
             kind_col = f"{GR}{kind:<{col_type}}{R}"
-        elif s.includes_video_track:
+        elif s.kind == "video":
             kind = "video only"
             kind_col = f"{CY}{kind:<{col_type}}{R}"
         else:
@@ -236,13 +255,13 @@ def display_streams(youtube: YouTube) -> None:
 # ── Video info header ─────────────────────────────────────────────────────────
 
 
-def _show_video_info(youtube: YouTube) -> None:
+def _show_video_info(video: Video) -> None:
     try:
-        title = youtube.title
-        author = youtube.author
-        length = _fmt_duration(youtube.length)
-        views = f"{youtube.views:,}"
-        url = youtube.watch_url
+        title = video.title
+        author = video.author.name
+        length = _fmt_duration(int(video.length.total_seconds()))
+        views = f"{video.views:,}" if video.views is not None else "n/a"
+        url = video.url
     except Exception:
         return
 
@@ -266,7 +285,7 @@ def _parse_categories(raw: str) -> List[str]:
 
 def _build_pp_chain(args) -> list:
     """Assemble the ordered list of post-processors from CLI args."""
-    pps = []
+    pps: list = []
 
     if not shutil.which("ffmpeg"):
         _needs = []
@@ -334,13 +353,13 @@ def _build_pp_chain(args) -> list:
     return pps
 
 
-def _run_pp_chain(pps: list, file_path: str, stream: Stream, youtube: YouTube) -> str:
+def _run_pp_chain(pps: list, file_path: str, stream: StreamRef, video: Video) -> str:
     """Run *pps* in sequence, threading the file path through each."""
     current = file_path
     for pp in pps:
         try:
             _print_section(f"Post-processing  {BWH}{pp.__class__.__name__}{R}")
-            current = pp.run(current, stream, youtube)
+            current = pp.run(current, stream, video)
         except PostProcessorError as exc:
             _print_err(f"{pp.__class__.__name__} failed: {exc}")
     return current
@@ -351,8 +370,8 @@ def _run_pp_chain(pps: list, file_path: str, stream: Stream, youtube: YouTube) -
 
 def _resolve_output(
     template: Optional[OutputTemplate],
-    youtube: YouTube,
-    stream: Stream,
+    video: Video,
+    stream: StreamRef,
     base_dir: Optional[str],
     playlist_index: Optional[int] = None,
     playlist_title: Optional[str] = None,
@@ -361,9 +380,10 @@ def _resolve_output(
     if template is None:
         return base_dir, None
 
-    rendered = template.render(youtube, stream, playlist_index, playlist_title)
+    rendered = template.render(video, stream, playlist_index, playlist_title)
     dir_part, file_part = os.path.split(rendered)
 
+    out_dir: Optional[str]
     if dir_part:
         out_dir = os.path.join(base_dir or ".", dir_part)
         os.makedirs(out_dir, exist_ok=True)
@@ -373,15 +393,78 @@ def _resolve_output(
     return out_dir, file_part or None
 
 
+# ── Stream selection ──────────────────────────────────────────────────────────
+
+
+def _res_int(stream: StreamRef) -> int:
+    return _resolution_to_int(stream.resolution) or 0
+
+
+def _is_avc(stream: StreamRef) -> bool:
+    return bool(stream.video_codec and stream.video_codec.startswith("avc"))
+
+
+def _by_itag(video: Video, itag: int) -> Optional[StreamRef]:
+    return next((s for s in video.streams if s.itag == itag), None)
+
+
+def _by_resolution(video: Video, resolution: str) -> Optional[StreamRef]:
+    candidates = [s for s in video.streams.progressive if s.resolution == resolution]
+    return next((s for s in candidates if s.subtype == "mp4"), None) or next(
+        iter(candidates), None
+    )
+
+
+def _best_progressive(video: Video) -> Optional[StreamRef]:
+    candidates = list(video.streams.progressive)
+    if not candidates:
+        return None
+    return max(candidates, key=lambda s: (_res_int(s), s.bitrate or 0))
+
+
+def _best_audio(video: Video, subtype: Optional[str] = None) -> Optional[StreamRef]:
+    audio = video.streams.audio
+    if subtype:
+        audio = audio.filter(subtype=subtype)
+    if not len(audio):
+        return None
+    return audio.best()
+
+
+def _best_video_only(video: Video, resolution: str = "best") -> Optional[StreamRef]:
+    """Pick the adaptive video track to merge with audio.
+
+    H.264 (avc1) is preferred at a given resolution: those streams are
+    fully cached across YouTube's CDN, while AV1/VP9 may be served from cache
+    only for low-view videos.
+    """
+    adaptive = [s for s in video.streams if s.kind == "video" and s.is_adaptive]
+    if resolution == "best":
+        pool = [s for s in adaptive if s.subtype == "mp4"] or adaptive
+        if not pool:
+            return None
+        top = max(_res_int(s) for s in pool)
+        at_top = [s for s in pool if _res_int(s) == top]
+        return next((s for s in at_top if _is_avc(s)), None) or at_top[0]
+
+    at_res = [s for s in adaptive if s.resolution == resolution]
+    mp4 = [s for s in at_res if s.subtype == "mp4"]
+    return (
+        next((s for s in mp4 if _is_avc(s)), None)
+        or next(iter(mp4), None)
+        or next(iter(at_res), None)
+    )
+
+
 # ── Download helpers ──────────────────────────────────────────────────────────
 
 
 def _download(
-    stream: Stream,
+    stream: StreamRef,
     target: Optional[str] = None,
     filename: Optional[str] = None,
     pp_chain: Optional[list] = None,
-    youtube: Optional[YouTube] = None,
+    video: Optional[Video] = None,
 ) -> Optional[str]:
     """Download *stream*, run post-processors, return the final file path."""
     _DL_STATE.clear()
@@ -394,15 +477,19 @@ def _download(
     _print_section(f"Downloading  {BWH}{name}{R}  {DM}[{size}]{R}")
     sys.stdout.write("\n")
 
-    file_path = stream.get_file_path(filename=filename, output_path=target)
-    if stream.exists_at_path(file_path):
+    file_path = os.path.join(target_directory(target), name)
+    if (
+        stream.filesize
+        and os.path.isfile(file_path)
+        and os.path.getsize(file_path) == stream.filesize
+    ):
         _print_warn(f"Already exists at  {DM}{file_path}{R}")
-        if pp_chain and youtube:
-            file_path = _run_pp_chain(pp_chain, file_path, stream, youtube)
+        if pp_chain and video:
+            file_path = _run_pp_chain(pp_chain, file_path, stream, video)
         return file_path
 
     try:
-        file_path = stream.download(output_path=target, filename=filename)
+        file_path = str(stream.download_to(target, filename=filename).run())
     except KeyboardInterrupt:
         _clear_progress_line()
         if os.path.exists(file_path):
@@ -412,428 +499,246 @@ def _download(
     sys.stdout.write("\n")
     _print_ok(f"Saved to  {DM}{file_path}{R}")
 
-    if pp_chain and youtube:
-        file_path = _run_pp_chain(pp_chain, file_path, stream, youtube)
+    if pp_chain and video:
+        file_path = _run_pp_chain(pp_chain, file_path, stream, video)
 
     return file_path
-
-
-def _unique_name(base: str, subtype: str, media_type: str, target: str) -> str:
-    counter = 0
-    while True:
-        name = f"{base}_{media_type}_{counter}"
-        if not os.path.exists(os.path.join(target, f"{name}.{subtype}")):
-            return name
-        counter += 1
 
 
 # ── Download commands ─────────────────────────────────────────────────────────
 
 
+def _download_or_interrupt(
+    stream: StreamRef,
+    target: Optional[str],
+    filename: Optional[str],
+    pp_chain: Optional[list],
+    video: Video,
+) -> Optional[str]:
+    try:
+        return _download(
+            stream, target=target, filename=filename, pp_chain=pp_chain, video=video
+        )
+    except KeyboardInterrupt:
+        sys.stdout.write("\n")
+        _print_warn("Interrupted.")
+        sys.exit(1)
+
+
 def download_by_itag(
-    youtube: YouTube,
+    video: Video,
     itag: int,
     target: Optional[str] = None,
     pp_chain: Optional[list] = None,
     filename: Optional[str] = None,
 ) -> Optional[str]:
-    stream = youtube.streams.get_by_itag(itag)
+    stream = _by_itag(video, itag)
     if stream is None:
         _print_err(f"No stream with itag {itag}. Available streams:")
-        display_streams(youtube)
+        display_streams(video)
         sys.exit(1)
-    youtube.register_on_progress_callback(on_progress)
-    try:
-        return _download(
-            stream, target=target, filename=filename, pp_chain=pp_chain, youtube=youtube
-        )
-    except KeyboardInterrupt:
-        sys.stdout.write("\n")
-        _print_warn("Interrupted.")
-        sys.exit(1)
+    return _download_or_interrupt(stream, target, filename, pp_chain, video)
 
 
 def download_by_resolution(
-    youtube: YouTube,
+    video: Video,
     resolution: str,
     target: Optional[str] = None,
     pp_chain: Optional[list] = None,
     filename: Optional[str] = None,
 ) -> Optional[str]:
-    stream = youtube.streams.get_by_resolution(resolution)
+    stream = _by_resolution(video, resolution)
     if stream is None:
         _print_err(f"No stream at {resolution}. Available streams:")
-        display_streams(youtube)
+        display_streams(video)
         sys.exit(1)
-    youtube.register_on_progress_callback(on_progress)
-    try:
-        return _download(
-            stream, target=target, filename=filename, pp_chain=pp_chain, youtube=youtube
-        )
-    except KeyboardInterrupt:
-        sys.stdout.write("\n")
-        _print_warn("Interrupted.")
-        sys.exit(1)
+    return _download_or_interrupt(stream, target, filename, pp_chain, video)
 
 
 def download_highest_resolution_progressive(
-    youtube: YouTube,
+    video: Video,
     target: Optional[str] = None,
     pp_chain: Optional[list] = None,
     filename: Optional[str] = None,
 ) -> Optional[str]:
-    youtube.register_on_progress_callback(on_progress)
-    try:
-        stream = youtube.streams.get_highest_resolution()
-    except exceptions.VideoUnavailable as err:
-        _print_err(f"Video unavailable: {err}")
+    stream = _best_progressive(video)
+    if stream is None:
+        _print_err("No progressive stream available. Available streams:")
+        display_streams(video)
         sys.exit(1)
-    try:
-        return _download(
-            stream, target=target, filename=filename, pp_chain=pp_chain, youtube=youtube
-        )
-    except KeyboardInterrupt:
-        sys.stdout.write("\n")
-        _print_warn("Interrupted.")
-        sys.exit(1)
+    return _download_or_interrupt(stream, target, filename, pp_chain, video)
 
 
 def download_audio(
-    youtube: YouTube,
+    video: Video,
     filetype: str,
     target: Optional[str] = None,
     pp_chain: Optional[list] = None,
     filename: Optional[str] = None,
 ) -> Optional[str]:
-    audio = (
-        youtube.streams.filter(only_audio=True, subtype=filetype).order_by("abr").last()
-    )
+    audio = _best_audio(video, filetype)
     if audio is None:
         _print_err(f"No {filetype} audio stream found. Available streams:")
-        display_streams(youtube)
+        display_streams(video)
         sys.exit(1)
-    youtube.register_on_progress_callback(on_progress)
-    try:
-        return _download(
-            audio, target=target, filename=filename, pp_chain=pp_chain, youtube=youtube
-        )
-    except KeyboardInterrupt:
-        sys.stdout.write("\n")
-        _print_warn("Interrupted.")
-        sys.exit(1)
+    return _download_or_interrupt(audio, target, filename, pp_chain, video)
 
 
 def download_caption(
-    youtube: YouTube, lang_code: Optional[str], target: Optional[str] = None
+    video: Video, lang_code: Optional[str], target: Optional[str] = None
 ) -> None:
-    try:
-        caption = youtube.captions[lang_code]
-        path = caption.download(title=youtube.title, output_path=target)
-        _print_ok(f"Caption saved to  {DM}{path}{R}")
-    except KeyError:
+    captions = video.captions
+    caption = captions.get(lang_code) if lang_code else None
+    if caption is None:
         _print_err(f"No caption with code '{lang_code}'. Available:")
-        _print_available_captions(youtube.captions)
+        _print_available_captions(captions)
+        return
+    path = caption.download(title=video.title, output_path=target)
+    _print_ok(f"Caption saved to  {DM}{path}{R}")
 
 
-def _print_available_captions(captions: CaptionQuery) -> None:
-    codes = "  ".join(f"{BCY}{c.code}{R}" for c in captions)
+def _print_available_captions(captions: Dict[str, Caption]) -> None:
+    codes = "  ".join(f"{BCY}{code}{R}" for code in captions)
     sys.stdout.write(f"  {codes}\n")
 
 
 def ffmpeg_process(
-    youtube: YouTube,
+    video: Video,
     resolution: str,
     target: Optional[str] = None,
     pp_chain: Optional[list] = None,
     final_filename: Optional[str] = None,
 ) -> Optional[str]:
-    youtube.register_on_progress_callback(on_progress)
     target = target or os.getcwd()
 
-    _is_avc = [lambda s: s.video_codec and s.video_codec.startswith("avc")]
-
-    if resolution == "best":
-        # Find the best resolution available, then prefer H.264 (avc1) at that
-        # resolution — H.264 streams are fully cached across YouTube's CDN while
-        # AV1/VP9 streams may be served from cache only for low-view videos.
-        _best = (
-            youtube.streams.filter(progressive=False, subtype="mp4")
-            .order_by("resolution")
-            .last()
-        ) or (youtube.streams.filter(progressive=False).order_by("resolution").last())
-        if _best:
-            video_stream = (
-                youtube.streams.filter(
-                    progressive=False,
-                    subtype="mp4",
-                    resolution=_best.resolution,
-                    custom_filter_functions=_is_avc,
-                ).first()
-            ) or _best
-        else:
-            video_stream = None
-    else:
-        video_stream = (
-            youtube.streams.filter(
-                progressive=False,
-                resolution=resolution,
-                subtype="mp4",
-                custom_filter_functions=_is_avc,
-            ).first()
-            or youtube.streams.filter(
-                progressive=False, resolution=resolution, subtype="mp4"
-            ).first()
-            or youtube.streams.filter(progressive=False, resolution=resolution).first()
-        )
-
+    video_stream = _best_video_only(video, resolution)
     if video_stream is None:
         _print_err(f"No stream at {resolution}. Available streams:")
-        display_streams(youtube)
+        display_streams(video)
         sys.exit(1)
 
-    audio_stream = (
-        youtube.streams.get_audio_only(video_stream.subtype)
-        or youtube.streams.filter(only_audio=True).order_by("abr").last()
-    )
+    audio_stream = _best_audio(video, video_stream.subtype) or _best_audio(video)
     if audio_stream is None:
         _print_err("No audio stream found.")
         sys.exit(1)
 
-    return _ffmpeg_downloader(
-        audio_stream=audio_stream,
+    return _merged_download(
+        video,
         video_stream=video_stream,
+        audio_stream=audio_stream,
         target=target,
         pp_chain=pp_chain,
-        youtube=youtube,
         final_filename=final_filename,
     )
 
 
-def _ffmpeg_downloader(
-    audio_stream: Stream,
-    video_stream: Stream,
+def _merged_download(
+    video: Video,
+    video_stream: StreamRef,
+    audio_stream: StreamRef,
     target: str,
     pp_chain: Optional[list] = None,
-    youtube: Optional[YouTube] = None,
     final_filename: Optional[str] = None,
 ) -> Optional[str]:
-    base = safe_filename(video_stream.title)
-    video_name = _unique_name(base, video_stream.subtype, "video", target)
-    audio_name = _unique_name(base, audio_stream.subtype, "audio", target)
-
-    video_filename = f"{video_name}.{video_stream.subtype}"
-    audio_filename = f"{audio_name}.{audio_stream.subtype}"
-    video_path = os.path.join(target, video_filename)
-    try:
-        _download(stream=video_stream, target=target, filename=video_filename)
-    except HTTPError as e:
-        if e.code != 403 or youtube is None:
-            raise
-        # CDN hasn't pre-cached this stream (common for low-view videos).
-        # Clean up the partial file and fall back to the best progressive stream.
-        _DL_STATE.clear()
-        if os.path.exists(video_path):
-            os.unlink(video_path)
-        prog = youtube.streams.get_highest_resolution()
-        if prog is None:
-            raise
-        _print_err(
-            f"DASH stream unavailable (403) — falling back to progressive "
-            f"{prog.resolution} ({prog.mime_type})"
-        )
-        prog_name = _unique_name(base, prog.subtype, "progressive", target)
-        prog_filename = f"{prog_name}.{prog.subtype}"
-        _download(stream=prog, target=target, filename=prog_filename)
-        prog_path = os.path.join(target, prog_filename)
-        final_name = final_filename or f"{base}.{prog.subtype}"
-        final_path = os.path.join(target, final_name)
-        shutil.move(prog_path, final_path)
-        _print_ok(f"Saved to   {DM}{final_path}{R}")
-        if pp_chain and youtube:
-            final_path = _run_pp_chain(pp_chain, final_path, prog, youtube)
-        return final_path
-
-    _DL_STATE.clear()
-    _download(stream=audio_stream, target=target, filename=audio_filename)
-
-    audio_path = os.path.join(target, audio_filename)
-
-    # Pick a container that actually accepts both codecs. Without this, a
-    # vp9+m4a or avc1+opus combo silently produces a broken file because
-    # `-codec copy` can't transmux into an incompatible container.
-    merge_ext = _pick_merge_container(video_stream, audio_stream)
-    if final_filename:
-        # Caller asked for a specific filename. If the requested extension is
-        # incompatible with the codecs, rewrite it to the safe one — the
-        # alternative is producing a "playable file" that isn't.
-        stem, ext = os.path.splitext(final_filename)
-        if ext.lstrip(".").lower() != merge_ext:
-            final_filename = f"{stem}.{merge_ext}"
-    else:
-        final_filename = f"{base}.{merge_ext}"
-    final_path = os.path.join(target, final_filename)
-
-    _print_section("Merging with ffmpeg")
-    ffmpeg_bin = shutil.which("ffmpeg")
-    if not ffmpeg_bin:
+    """Fetch both tracks over one session, merge with ffmpeg, post-process."""
+    if not shutil.which("ffmpeg"):
         _print_err("ffmpeg not found on PATH; cannot merge.")
         sys.exit(1)
-    cmd = [
-        ffmpeg_bin,
-        "-y",
-        "-loglevel",
-        "warning",
-        "-nostats",
-        # Drop corrupt packets rather than halting on the first bad one.
-        # Without these, libdav1d giving up on a truncated AV1 stream
-        # leaves the muxer with a 4-second output from a 2-minute source
-        # (silently — exit code is still 0). See pyt.api._merge for the
-        # same hardening in the modern path.
-        "-fflags",
-        "+discardcorrupt",
-        "-err_detect",
-        "ignore_err",
-        "-i",
-        video_path,
-        "-i",
-        audio_path,
-        "-map",
-        "0:v:0",
-        "-map",
-        "1:a:0",
-        "-c:v",
-        "copy",
-        "-c:a",
-        "copy",
-    ]
-    if merge_ext == "mp4":
-        cmd += ["-movflags", "+faststart"]
-    cmd.append(final_path)
 
-    result = subprocess.run(cmd, capture_output=True, check=False)  # nosec
-    if result.returncode != 0:
-        # Leave the source files behind so the user can retry / inspect.
-        _print_err(
-            f"ffmpeg merge failed (exit {result.returncode}):\n"
-            + result.stderr.decode("utf-8", errors="replace")
-        )
-        if os.path.exists(final_path):
-            try:
-                os.unlink(final_path)
-            except OSError:
-                pass
+    _DL_STATE.clear()
+    _print_section(
+        f"Downloading  {BWH}{video_stream.resolution or 'video'} + "
+        f"{audio_stream.abr or 'audio'}{R}"
+    )
+    sys.stdout.write("\n")
+
+    plan = CombinedDownload(
+        video=video,
+        video_stream=video_stream,
+        audio_stream=audio_stream,
+        output_path=target,
+        filename=final_filename,
+    )
+    try:
+        final_path = str(plan.run())
+    except KeyboardInterrupt:
+        _clear_progress_line()
+        _print_warn("Interrupted.")
         sys.exit(1)
+    except DownloadError as exc:
+        # The adaptive tracks couldn't be fetched (e.g. the CDN hasn't
+        # pre-cached them, common for low-view videos). Fall back to the best
+        # progressive stream, which has audio built in.
+        _clear_progress_line()
+        prog = _best_progressive(video)
+        if prog is None:
+            _print_err(str(exc))
+            sys.exit(1)
+        _print_err(
+            f"Merged download failed ({exc}) — falling back to progressive "
+            f"{prog.resolution} ({prog.mime_type})"
+        )
+        _DL_STATE.clear()
+        name = None
+        if final_filename:
+            name = f"{os.path.splitext(final_filename)[0]}.{prog.subtype}"
+        return _download(
+            prog, target=target, filename=name, pp_chain=pp_chain, video=video
+        )
 
-    # ffmpeg returned 0 — but with -c copy + libdav1d/libaom, an exit code
-    # of 0 doesn't actually mean "muxed everything." Compare durations to
-    # catch the silently-truncated case where we'd otherwise tell the user
-    # "Saved" for a 4-second clip from a 2-minute video.
-    from pyt.api._merge import probe_duration
-
-    out_dur = probe_duration(Path(final_path))
-    if out_dur is not None:
-        in_durs = [probe_duration(Path(p)) for p in (video_path, audio_path)]
-        in_durs = [d for d in in_durs if d is not None]
-        if in_durs:
-            expected = max(in_durs)
-            if expected > 0 and out_dur < expected * 0.9:
-                _print_err(
-                    f"merge produced {out_dur:.1f}s of output but the inputs "
-                    f"are ~{expected:.1f}s — the video stream is likely "
-                    f"corrupt or truncated. Source files preserved at:\n"
-                    f"  {video_path}\n  {audio_path}\n"
-                    f"Try re-downloading."
-                )
-                try:
-                    os.unlink(final_path)
-                except OSError:
-                    pass
-                sys.exit(1)
-
-    # Merge succeeded — now safe to drop sources.
-    for p in (video_path, audio_path):
-        try:
-            os.unlink(p)
-        except OSError as e:
-            logger.warning("could not delete %s: %s", p, e)
+    sys.stdout.write("\n")
     _print_ok(f"Merged to  {DM}{final_path}{R}")
 
-    if pp_chain and youtube:
-        final_path = _run_pp_chain(pp_chain, final_path, video_stream, youtube)
+    if pp_chain:
+        final_path = _run_pp_chain(pp_chain, final_path, video_stream, video)
 
     return final_path
 
 
-def _pick_merge_container(video_stream: Stream, audio_stream: Stream) -> str:
-    """Pick the right container for muxing *video_stream* and *audio_stream*.
-
-    YouTube serves video as one of: avc1 (H.264) in mp4, vp9 in webm, av01 in mp4.
-    Audio: mp4a/aac in m4a, opus in webm.
-    `-codec copy` requires the container to accept both codecs. mp4 takes
-    avc1+aac and av01+aac; webm takes vp9+opus. mkv accepts everything and is
-    the safe fallback for cross-family combinations.
-    """
-    v = (video_stream.video_codec or "").lower()
-    a = (audio_stream.audio_codec or "").lower()
-    is_avc = v.startswith("avc")
-    is_av1 = v.startswith("av01") or v.startswith("av1")
-    is_vp9 = v.startswith("vp9") or v.startswith("vp09")
-    is_aac = a.startswith("mp4a") or a.startswith("aac")
-    is_opus = a.startswith("opus")
-
-    if (is_avc or is_av1) and is_aac:
-        return "mp4"
-    if is_vp9 and is_opus:
-        return "webm"
-    return "mkv"
-
-
-def build_playback_report(youtube: YouTube) -> None:
-    ts = int(dt.datetime.now(dt.UTC).timestamp())
-    fp = os.path.join(os.getcwd(), f"yt-video-{youtube.video_id}-{ts}.json.gz")
+def build_playback_report(video: Video) -> None:
+    ts = int(dt.datetime.now(dt.timezone.utc).timestamp())
+    fp = os.path.join(os.getcwd(), f"yt-video-{video.video_id}-{ts}.json.gz")
     with gzip.open(fp, "wb") as fh:
         fh.write(
             json.dumps(
                 {
-                    "url": youtube.watch_url,
-                    "js": youtube.js,
-                    "watch_html": youtube.watch_html,
-                    "video_info": youtube.vid_info,
+                    "url": video.url,
+                    "video_info": video.player_response,
                 }
             ).encode("utf-8")
         )
     _print_ok(f"Playback report saved to  {DM}{fp}{R}")
 
 
-def dump_json(youtube: YouTube) -> None:
+def dump_json(video: Video) -> None:
     """Print video metadata as JSON without downloading."""
     try:
         info = {
-            "id": youtube.video_id,
-            "title": youtube.title,
-            "author": youtube.author,
-            "channel_id": youtube.channel_id,
-            "channel_url": youtube.channel_url,
-            "length": youtube.length,
-            "views": youtube.views,
+            "id": video.video_id,
+            "title": video.title,
+            "author": video.author.name,
+            "channel_id": video.author.id,
+            "channel_url": video.author.url,
+            "length": int(video.length.total_seconds()),
+            "views": video.views,
             "publish_date": (
-                youtube.publish_date.isoformat() if youtube.publish_date else None
+                video.published_at.isoformat() if video.published_at else None
             ),
-            "description": youtube.description,
-            "keywords": youtube.keywords,
-            "thumbnail_url": youtube.thumbnail_url,
-            "watch_url": youtube.watch_url,
+            "description": video.description,
+            "keywords": video.metadata.keywords,
+            "thumbnail_url": video.thumbnail_url,
+            "watch_url": video.url,
             "streams": [
                 {
                     "itag": s.itag,
                     "mime_type": s.mime_type,
                     "resolution": s.resolution,
-                    "fps": getattr(s, "fps", None),
+                    "fps": s.fps,
                     "abr": s.abr,
                     "filesize": s.filesize_approx,
                     "is_progressive": s.is_progressive,
                 }
-                for s in youtube.streams
+                for s in video.streams
             ],
         }
     except Exception as exc:
@@ -939,7 +844,7 @@ def _print_help() -> None:
     sec("Misc")
     row("-v, --verbose", "Debug logging")
     row("--logfile FILE", "Write log to file instead of stderr")
-    row("--build-playback-report", "Dump raw page data for bug reports")
+    row("--build-playback-report", "Dump the raw player response for bug reports")
     row("--version", "Print version and exit")
 
     gap()
@@ -1038,29 +943,17 @@ def _parse_args(
 # ── Single-video processing ───────────────────────────────────────────────────
 
 
-def _perform_args_on_youtube(
-    youtube: YouTube,
+def _perform_args_on_video(
+    video: Video,
     args: argparse.Namespace,
     archive: Optional[DownloadArchive] = None,
     template: Optional[OutputTemplate] = None,
     playlist_index: Optional[int] = None,
     playlist_title: Optional[str] = None,
 ) -> None:
-    # Availability check — raises a descriptive PytError subclass if the video
-    # cannot be played (private, members-only, region-blocked, live, etc.).
-    # Non-VideoUnavailable failures (network, parse errors) are ignored here
-    # and will surface naturally when streams are accessed.
-    try:
-        youtube.check_availability()
-    except exceptions.VideoUnavailable as exc:
-        _print_err(str(exc))
-        return
-    except Exception:
-        pass
-
     # Archive check
-    if archive and archive.is_downloaded(youtube.video_id):
-        _print_warn(f"Skipping  {DM}{youtube.video_id}{R}  (already in archive)")
+    if archive and archive.is_downloaded(video.video_id):
+        _print_warn(f"Skipping  {DM}{video.video_id}{R}  (already in archive)")
         return
 
     no_action = not any(
@@ -1078,25 +971,23 @@ def _perform_args_on_youtube(
         ]
     )
 
-    _show_video_info(youtube)
+    _show_video_info(video)
 
     if args.dump_json:
-        dump_json(youtube)
+        dump_json(video)
         return
 
     if args.list:
-        display_streams(youtube)
+        display_streams(video)
     if args.list_captions:
         _print_section("Available captions")
-        _print_available_captions(youtube.captions)
+        _print_available_captions(video.captions)
     if args.build_playback_report:
-        build_playback_report(youtube)
+        build_playback_report(video)
 
     # Caption download (standalone, not post-processing)
     if args.caption_code and not args.embed_subs:
-        download_caption(
-            youtube=youtube, lang_code=args.caption_code, target=args.target
-        )
+        download_caption(video=video, lang_code=args.caption_code, target=args.target)
 
     # Build post-processor chain once
     pp_chain = _build_pp_chain(args)
@@ -1105,17 +996,18 @@ def _perform_args_on_youtube(
         if template is None:
             return args.target, None
         return _resolve_output(
-            template, youtube, stream, args.target, playlist_index, playlist_title
+            template, video, stream, args.target, playlist_index, playlist_title
         )
 
+    def _resolve_if_found(stream):
+        if template and stream:
+            return _resolve(stream)
+        return args.target, None
+
     if args.itag:
-        if template:
-            s = youtube.streams.get_by_itag(args.itag)
-            out_dir, fname = _resolve(s) if s else (args.target, None)
-        else:
-            out_dir, fname = args.target, None
+        out_dir, fname = _resolve_if_found(_by_itag(video, args.itag))
         download_by_itag(
-            youtube=youtube,
+            video=video,
             itag=args.itag,
             target=out_dir,
             pp_chain=pp_chain,
@@ -1123,13 +1015,9 @@ def _perform_args_on_youtube(
         )
 
     if args.resolution:
-        if template:
-            s = youtube.streams.get_by_resolution(args.resolution)
-            out_dir, fname = _resolve(s) if s else (args.target, None)
-        else:
-            out_dir, fname = args.target, None
+        out_dir, fname = _resolve_if_found(_by_resolution(video, args.resolution))
         download_by_resolution(
-            youtube=youtube,
+            video=video,
             resolution=args.resolution,
             target=out_dir,
             pp_chain=pp_chain,
@@ -1137,17 +1025,9 @@ def _perform_args_on_youtube(
         )
 
     if args.audio:
-        if template:
-            s = (
-                youtube.streams.filter(only_audio=True, subtype=args.audio)
-                .order_by("abr")
-                .last()
-            )
-            out_dir, fname = _resolve(s) if s else (args.target, None)
-        else:
-            out_dir, fname = args.target, None
+        out_dir, fname = _resolve_if_found(_best_audio(video, args.audio))
         download_audio(
-            youtube=youtube,
+            video=video,
             filetype=args.audio,
             target=out_dir,
             pp_chain=pp_chain,
@@ -1155,20 +1035,9 @@ def _perform_args_on_youtube(
         )
 
     if args.ffmpeg:
-        if template:
-            vs = (
-                youtube.streams.filter(progressive=False, subtype="mp4")
-                .order_by("resolution")
-                .last()
-                or youtube.streams.filter(progressive=False)
-                .order_by("resolution")
-                .last()
-            )
-            out_dir, final_name = _resolve(vs) if vs else (args.target, None)
-        else:
-            out_dir, final_name = args.target, None
+        out_dir, final_name = _resolve_if_found(_best_video_only(video))
         ffmpeg_process(
-            youtube=youtube,
+            video=video,
             resolution=args.ffmpeg,
             target=out_dir,
             pp_chain=pp_chain,
@@ -1182,41 +1051,18 @@ def _perform_args_on_youtube(
         and not args.resolution
         and not args.itag
     ):
-        audio_stream = youtube.streams.filter(only_audio=True).order_by("abr").last()
+        audio_stream = _best_audio(video)
         if audio_stream is None:
             _print_err("No audio stream found.")
             sys.exit(1)
         out_dir, fname = _resolve(audio_stream)
-        youtube.register_on_progress_callback(on_progress)
-        try:
-            _download(
-                audio_stream,
-                target=out_dir,
-                filename=fname,
-                pp_chain=pp_chain,
-                youtube=youtube,
-            )
-        except KeyboardInterrupt:
-            sys.stdout.write("\n")
-            _print_warn("Interrupted.")
-            sys.exit(1)
+        _download_or_interrupt(audio_stream, out_dir, fname, pp_chain, video)
 
     if no_action:
         if shutil.which("ffmpeg"):
-            if template:
-                vs = (
-                    youtube.streams.filter(progressive=False, subtype="mp4")
-                    .order_by("resolution")
-                    .last()
-                    or youtube.streams.filter(progressive=False)
-                    .order_by("resolution")
-                    .last()
-                )
-                out_dir, final_name = _resolve(vs) if vs else (args.target, None)
-            else:
-                out_dir, final_name = args.target, None
+            out_dir, final_name = _resolve_if_found(_best_video_only(video))
             ffmpeg_process(
-                youtube=youtube,
+                video=video,
                 resolution="best",
                 target=out_dir,
                 pp_chain=pp_chain,
@@ -1226,18 +1072,14 @@ def _perform_args_on_youtube(
             _print_warn(
                 "ffmpeg not found — falling back to best progressive stream (max 720p)"
             )
-            if template:
-                s = youtube.streams.get_highest_resolution()
-                out_dir, fname = _resolve(s) if s else (args.target, None)
-            else:
-                out_dir, fname = args.target, None
+            out_dir, fname = _resolve_if_found(_best_progressive(video))
             download_highest_resolution_progressive(
-                youtube=youtube, target=out_dir, pp_chain=pp_chain, filename=fname
+                video=video, target=out_dir, pp_chain=pp_chain, filename=fname
             )
 
     # Mark as downloaded after all actions complete
     if archive:
-        archive.mark_downloaded(youtube.video_id)
+        archive.mark_downloaded(video.video_id)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -1256,10 +1098,9 @@ def _iter_batch_urls(path: str) -> List[str]:
 
 def _resolve_po_token(args) -> Optional[str]:
     """Reduce ``--po-token`` / ``--po-token-cmd`` / ``--po-token-script``
-    to a single token string. Runs the generator once at startup; the
-    legacy CLI's :class:`YouTube` doesn't support auto-retry, so a
-    long-running download with a stale token would need to be re-run.
-    Use the modern :class:`pyt.Client` API for auto-retry.
+    to a single token string. Runs the generator once at startup, so a
+    long-running batch with a stale token would need to be re-run. Use
+    :class:`pyt.Client` directly for auto-refresh on ATTESTATION_REQUIRED.
     """
     set_count = sum(
         1
@@ -1300,26 +1141,20 @@ def _resolve_po_token(args) -> Optional[str]:
     return None
 
 
-def _setup_cookies(args) -> None:
-    """Install cookies into pyt's request layer if requested."""
-    if getattr(args, "cookies", None):
-        from pyt.cookies import install_cookies, load_cookies_from_file
-
-        try:
-            install_cookies(load_cookies_from_file(args.cookies))
-            _print_ok(f"Loaded cookies from  {DM}{args.cookies}{R}")
-        except Exception as exc:
-            _print_err(f"Failed to load cookies: {exc}")
-            sys.exit(1)
-    elif getattr(args, "cookies_from_browser", None):
-        from pyt.cookies import install_cookies, load_cookies_from_browser
-
-        try:
-            install_cookies(load_cookies_from_browser(args.cookies_from_browser))
-            _print_ok(f"Loaded cookies from  {DM}{args.cookies_from_browser}{R}")
-        except Exception as exc:
-            _print_err(f"Failed to load cookies from browser: {exc}")
-            sys.exit(1)
+def _setup_cookies(client: Client, args) -> None:
+    """Install the client's cookies into pyt's request layer, if any."""
+    source = getattr(args, "cookies", None) or getattr(
+        args, "cookies_from_browser", None
+    )
+    if not source:
+        return
+    try:
+        client._ensure_cookies_installed()
+    except Exception as exc:
+        what = "cookies" if getattr(args, "cookies", None) else "cookies from browser"
+        _print_err(f"Failed to load {what}: {exc}")
+        sys.exit(1)
+    _print_ok(f"Loaded cookies from  {DM}{source}{R}")
 
 
 def _setup_geo_bypass(args) -> None:
@@ -1450,6 +1285,7 @@ def _run_doctor(args) -> int:
 
 
 def main() -> None:
+    _make_stdout_safe()
     parser = argparse.ArgumentParser(prog="pyt", add_help=False)
     parser.add_argument("-h", "--help", action="store_true")
     args = _parse_args(parser)
@@ -1468,9 +1304,9 @@ def main() -> None:
 
         level = TRACE if args.verbose >= 2 else logging.DEBUG
         setup_logger(level, log_filename=args.logfile)
-        # Modern API uses the public log-control API; route the same
-        # CLI verbosity through it so consumers of pyt.api see the
-        # same level the legacy paths see.
+        # Route the same CLI verbosity through the public log-control API
+        # so consumers of pyt.api see the
+        # same level the modern API sees.
         from pyt.api._logging import enable_logging
 
         enable_logging(level=level, file=args.logfile)
@@ -1479,19 +1315,25 @@ def main() -> None:
     # Merge config file values (CLI flags take precedence)
     apply_config(args, load_config())
 
-    # Network setup
-    _setup_cookies(args)
-    _setup_geo_bypass(args)
-
-    # Resolve PO token once at startup. We mutate args.po_token in place
-    # so the existing legacy code path below still uses `args.po_token`
-    # without further changes.
+    # Resolve PO token once at startup.
     args.po_token = _resolve_po_token(args)
 
-    # Proxy (proxies dict is passed per-YouTube instance below)
-    proxies = None
-    if getattr(args, "proxy", None):
-        proxies = {"http": args.proxy, "https": args.proxy}
+    try:
+        client = Client(
+            proxy=getattr(args, "proxy", None),
+            cookies=getattr(args, "cookies", None),
+            cookies_from_browser=getattr(args, "cookies_from_browser", None),
+            po_token=args.po_token,
+            on_progress=on_progress,
+        )
+    except PytError as exc:
+        _print_err(str(exc))
+        sys.exit(1)
+
+    # Network setup. Cookies go in first so geo-bypass wraps the cookie-aware
+    # request function rather than being replaced by it.
+    _setup_cookies(client, args)
+    _setup_geo_bypass(args)
 
     # Archive
     archive: Optional[DownloadArchive] = None
@@ -1530,84 +1372,73 @@ def main() -> None:
         if _is_channel_url(url):
             sys.stdout.write(f"\n  {DM}Loading channel …{R}\n")
             try:
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore", DeprecationWarning)
-                    channel = Channel(url)
-                playlist_title = (
-                    getattr(channel, "channel_name", None)
-                    or url.rstrip("/").split("/")[-1]
+                channel = client.channel(url)
+                title = channel.name or url.rstrip("/").split("/")[-1]
+                _download_feed(
+                    client, channel, title, "channel", args, archive, template
                 )
-                if not args.target and not template:
-                    args.target = safe_filename(playlist_title)
-                video_urls = list(channel.video_urls)
-                if not video_urls:
-                    _print_warn("No videos found on this channel.")
-                for idx, video in enumerate(channel.videos, start=1):
-                    try:
-                        _perform_args_on_youtube(
-                            video,
-                            args,
-                            archive=archive,
-                            template=template,
-                            playlist_index=idx,
-                            playlist_title=playlist_title,
-                        )
-                    except exceptions.PytError as exc:
-                        _print_err(f"{video.watch_url}  —  {exc}")
-                    if idx < len(video_urls):
-                        _sleep_between(args)
             except Exception as exc:
                 _print_err(f"Could not load channel: {exc}")
 
         elif "/playlist" in url:
             sys.stdout.write(f"\n  {DM}Loading playlist …{R}\n")
             try:
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore", DeprecationWarning)
-                    playlist = Playlist(url)
-                playlist_title = getattr(playlist, "title", None)
-                if not args.target and not template:
-                    args.target = safe_filename(playlist_title or "playlist")
-                video_urls = list(playlist.video_urls)
-                if not video_urls:
-                    _print_warn("No videos found in this playlist.")
-                for idx, video in enumerate(playlist.videos, start=1):
-                    try:
-                        _perform_args_on_youtube(
-                            video,
-                            args,
-                            archive=archive,
-                            template=template,
-                            playlist_index=idx,
-                            playlist_title=playlist_title,
-                        )
-                    except exceptions.PytError as exc:
-                        _print_err(f"{video.watch_url}  —  {exc}")
-                    if idx < len(video_urls):
-                        _sleep_between(args)
-            except exceptions.PytError as exc:
-                _print_err(f"Could not load playlist: {exc}")
+                playlist = client.playlist(url)
+                title = playlist.title or "playlist"
+                _download_feed(
+                    client, playlist, title, "playlist", args, archive, template
+                )
             except Exception as exc:
                 _print_err(f"Could not load playlist: {exc}")
 
         else:
             sys.stdout.write(f"\n  {DM}Fetching  {url} …{R}\n")
             try:
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore", DeprecationWarning)
-                    youtube = YouTube(url, proxies=proxies, po_token=args.po_token)
-                _perform_args_on_youtube(
-                    youtube,
+                video = client.video(url)
+                _perform_args_on_video(
+                    video,
                     args,
                     archive=archive,
                     template=template,
                 )
-            except exceptions.VideoUnavailable as exc:
-                _print_err(str(exc))
-            except exceptions.PytError as exc:
+            except PytError as exc:
                 _print_err(str(exc))
             except Exception as exc:
                 _print_err(f"Error: {exc}")
+
+
+def _download_feed(
+    client: Client,
+    feed,
+    title: str,
+    noun: str,
+    args: argparse.Namespace,
+    archive: Optional[DownloadArchive],
+    template: Optional[OutputTemplate],
+) -> None:
+    """Run the requested actions over every video of a playlist or channel."""
+    if not args.target and not template:
+        args.target = safe_filename(title)
+    video_urls = list(feed.video_urls)
+    if not video_urls:
+        _print_warn(f"No videos found in this {noun}.")
+    for idx, video_url in enumerate(video_urls, start=1):
+        try:
+            video = client.video(video_url)
+            _perform_args_on_video(
+                video,
+                args,
+                archive=archive,
+                template=template,
+                playlist_index=idx,
+                playlist_title=title,
+            )
+        except PytError as exc:
+            _print_err(f"{video_url}  —  {exc}")
+        except Exception as exc:
+            _print_err(f"{video_url}  —  Error: {exc}")
+        if idx < len(video_urls):
+            _sleep_between(args)
 
 
 if __name__ == "__main__":

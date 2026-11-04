@@ -36,9 +36,9 @@ def _yt(
 
     yt = mock.MagicMock()
     yt.title = title
-    yt.author = author
+    yt.author.name = author
     yt.video_id = video_id
-    yt.publish_date = publish_date or datetime(2024, 1, 15)
+    yt.published_at = publish_date or datetime(2024, 1, 15)
     yt.description = description
     yt.thumbnail_url = thumbnail_url
     yt.captions = captions or {}
@@ -288,8 +288,8 @@ def test_collect_meta_skips_none_fields(fake_ffmpeg):
     embedder = FFmpegMetadataEmbedder()
     yt = mock.MagicMock()
     yt.title = None
-    yt.author = "Author"
-    yt.publish_date = None
+    yt.author.name = "Author"
+    yt.published_at = None
     yt.description = None
     meta = embedder._collect_meta(yt)
     assert "title" not in meta

@@ -1,14 +1,11 @@
 import os
-import io
-import json
-import gzip
 
 from unittest import mock
 
 import pytest
 from pyt import helpers
 from pyt.exceptions import RegexMatchError
-from pyt.helpers import cache, create_mock_html_json, deprecated, setup_logger
+from pyt.helpers import cache, deprecated, setup_logger
 from pyt.helpers import target_directory, uniqueify
 
 
@@ -90,69 +87,6 @@ def test_setup_logger(logging):
     logging.getLogger.assert_called_with("pyt")
     logger.addHandler.assert_called()
     logger.setLevel.assert_called_with(20)
-
-
-@mock.patch("builtins.open", new_callable=mock.mock_open)
-@mock.patch("pyt.request.urlopen")
-def test_create_mock_html_json(mock_url_open, mock_open):
-    video_id = "2lAe1cqCOXo"
-    gzip_html_filename = "yt-video-%s-html.json.gz" % video_id
-
-    # Get the pyt directory in order to navigate to /tests/mocks
-    pyt_dir_path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), os.path.pardir)
-    )
-    pyt_mocks_path = os.path.join(pyt_dir_path, "tests", "mocks")
-    gzip_html_filepath = os.path.join(pyt_mocks_path, gzip_html_filename)
-
-    # Mock the responses to YouTube
-    mock_url_open_object = mock.Mock()
-
-    # Order is:
-    # 1. watch_html -- must have jsurl match
-    # 2. embed html
-    # 3. watch html
-    # 4. raw vid info
-    mock_url_open_object.read.side_effect = [
-        (
-            b'yt.setConfig({"PLAYER_CONFIG":{"args":[]}});ytInitialData = {};ytInitialPlayerResponse = {};'  # noqa: E501
-            b'"jsUrl":"/s/player/13371337/player_ias.vflset/en_US/base.js"'
-        ),
-        b"embed_html",
-        b"watch_html",
-        b'{"responseContext":{}}',
-    ]
-    mock_url_open.return_value = mock_url_open_object
-
-    # Generate a json with sample html json
-    result_data = create_mock_html_json(video_id)
-
-    # Assert that a write was only made once
-    mock_open.assert_called_once_with(gzip_html_filepath, "wb")
-
-    # The result data should look like this:
-    gzip_file = io.BytesIO()
-    with gzip.GzipFile(filename=gzip_html_filename, fileobj=gzip_file, mode="wb") as f:
-        f.write(json.dumps(result_data).encode("utf-8"))
-    gzip_data = gzip_file.getvalue()
-
-    file_handle = mock_open.return_value.__enter__.return_value
-
-    # For some reason, write gets called multiple times, so we have to
-    #  concatenate all the write calls to get the full data before we compare
-    #  it to the BytesIO object value.
-    full_content = b""
-    for call in file_handle.write.call_args_list:
-        args, kwargs = call
-        full_content += b"".join(args)
-
-    # The file header includes time metadata, so *occasionally* a single
-    #  byte will be off at the very beginning. In theory, this difference
-    #  should only affect bytes 5-8 (or [4:8] because of zero-indexing),
-    #  but I've excluded the 10-byte metadata header altogether from the
-    #  check, just to be safe.
-    # Source: https://en.wikipedia.org/wiki/Gzip#File_format
-    assert gzip_data[10:] == full_content[10:]
 
 
 def test_uniqueify():

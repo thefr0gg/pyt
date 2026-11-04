@@ -62,19 +62,19 @@ class _SponsorBlock(PipelineStep):
 
     def apply(self, path: str, *, stream: "StreamRef", video: "Video") -> str:
         pp = SponsorBlockPP(mode=self.mode, categories=list(self.categories))
-        return pp.run(path, stream.legacy, video.legacy)
+        return pp.run(path, stream, video)
 
 
 @dataclass(frozen=True)
 class _EmbedMetadata(PipelineStep):
     def apply(self, path: str, *, stream: "StreamRef", video: "Video") -> str:
-        return FFmpegMetadataEmbedder().run(path, stream.legacy, video.legacy)
+        return FFmpegMetadataEmbedder().run(path, stream, video)
 
 
 @dataclass(frozen=True)
 class _EmbedThumbnail(PipelineStep):
     def apply(self, path: str, *, stream: "StreamRef", video: "Video") -> str:
-        return EmbedThumbnailPostProcessor().run(path, stream.legacy, video.legacy)
+        return EmbedThumbnailPostProcessor().run(path, stream, video)
 
 
 @dataclass(frozen=True)
@@ -82,9 +82,7 @@ class _EmbedSubtitles(PipelineStep):
     lang: str = "en"
 
     def apply(self, path: str, *, stream: "StreamRef", video: "Video") -> str:
-        return EmbedSubtitlePostProcessor(lang_code=self.lang).run(
-            path, stream.legacy, video.legacy
-        )
+        return EmbedSubtitlePostProcessor(lang_code=self.lang).run(path, stream, video)
 
 
 @dataclass(frozen=True)
@@ -94,7 +92,7 @@ class _ExtractAudio(PipelineStep):
 
     def apply(self, path: str, *, stream: "StreamRef", video: "Video") -> str:
         return AudioExtractor(format=self.format, quality=self.quality).run(
-            path, stream.legacy, video.legacy
+            path, stream, video
         )
 
 

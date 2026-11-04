@@ -1,6 +1,6 @@
 """Native InnerTube channel/playlist listing.
 
-Replaces the legacy pyt.contrib.channel / pyt.contrib.playlist HTML
+Replaces the pytube-era channel / playlist HTML
 scrapers, which target renderer shapes (gridRenderer/gridVideoRenderer,
 playlistVideoListRenderer/playlistVideoRenderer) YouTube has since moved
 off of. Current responses for both a channel's Videos tab and a

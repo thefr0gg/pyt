@@ -4,10 +4,10 @@ import os
 import json
 import gzip
 
-from unittest import mock
 
 import pytest
-from pyt.legacy import YouTube
+
+from pyt import extract
 
 
 def load_playback_file(filename):
@@ -20,42 +20,36 @@ def load_playback_file(filename):
         return json.loads(content)
 
 
-@mock.patch("pyt.request.urlopen")
-def load_and_init_from_playback_file(filename, mock_urlopen):
-    """Load a gzip json playback file and create YouTube instance."""
-    pb = load_playback_file(filename)
+class PlaybackFixture:
+    """A recorded watch page, player JS and player response for one video."""
 
-    # Mock the responses to YouTube
-    mock_url_open_object = mock.Mock()
-    mock_url_open_object.read.side_effect = [
-        pb["watch_html"].encode("utf-8"),
-        pb["js"].encode("utf-8"),
-    ]
-    mock_urlopen.return_value = mock_url_open_object
+    def __init__(self, recording):
+        self.watch_url = recording["url"]
+        self.video_id = extract.video_id(self.watch_url)
+        self.watch_html = recording["watch_html"]
+        self.js = recording["js"]
+        self._vid_info = recording["vid_info"]
 
-    # Pytest caches this result, so we can speed up the tests
-    #  by causing the object to fetch all the relevant information
-    #  it needs. Previously, this was handled by prefetch_init()
-    #  and descramble(), but this functionality has since been
-    #  deferred
-    v = YouTube(pb["url"])
-    v.watch_html
-    v._vid_info = pb["vid_info"]
-    v.js
-    v.fmt_streams
-    return v
+    @property
+    def publish_date(self):
+        return extract.publish_date(self.watch_html)
+
+
+def load_and_init_from_playback_file(filename):
+    """Load a gzip json playback file into a :class:`PlaybackFixture`."""
+    return PlaybackFixture(load_playback_file(filename))
 
 
 @pytest.fixture
 def cipher_signature():
-    """Youtube instance initialized with video id 2lAe1cqCOXo."""
+    """Recording of video id 2lAe1cqCOXo."""
     filename = "yt-video-2lAe1cqCOXo-html.json.gz"
     return load_and_init_from_playback_file(filename)
 
 
 @pytest.fixture
 def presigned_video():
-    """Youtube instance initialized with video id QRS8MkLhQmM."""
+    """Recording of video id QRS8MkLhQmM."""
     filename = "yt-video-QRS8MkLhQmM-html.json.gz"
     return load_and_init_from_playback_file(filename)
 
@@ -82,48 +76,6 @@ def missing_recording():
 
 
 @pytest.fixture
-def playlist_html():
-    """Youtube playlist HTML loaded on 2020-01-25 from
-    https://www.youtube.com/playlist?list=PLzMcBGfZo4-mP7qA9cagf68V06sko5otr
-    """
-    file_path = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)),
-        "mocks",
-        "playlist.html.gz",
-    )
-    with gzip.open(file_path, "rb") as f:
-        return f.read().decode("utf-8")
-
-
-@pytest.fixture
-def playlist_long_html():
-    """Youtube playlist HTML loaded on 2020-01-25 from
-    https://www.youtube.com/playlist?list=PLzMcBGfZo4-mP7qA9cagf68V06sko5otr
-    """
-    file_path = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)),
-        "mocks",
-        "playlist_long.html.gz",
-    )
-    with gzip.open(file_path, "rb") as f:
-        return f.read().decode("utf-8")
-
-
-@pytest.fixture
-def playlist_submenu_html():
-    """Youtube playlist HTML loaded on 2020-01-24 from
-    https://www.youtube.com/playlist?list=PLZHQObOWTQDMsr9K-rj53DwVRMYO3t5Yr
-    """
-    file_path = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)),
-        "mocks",
-        "playlist_submenu.html.gz",
-    )
-    with gzip.open(file_path, "rb") as f:
-        return f.read().decode("utf-8")
-
-
-@pytest.fixture
 def stream_dict():
     """Youtube instance initialized with video id WXxV9g7lsFE."""
     file_path = os.path.join(
@@ -134,20 +86,6 @@ def stream_dict():
     with gzip.open(file_path, "rb") as f:
         content = json.loads(f.read().decode("utf-8"))
         return content["watch_html"]
-
-
-@pytest.fixture
-def channel_videos_html():
-    """Youtube channel HTML loaded on 2021-05-05 from
-    https://www.youtube.com/c/ProgrammingKnowledge/videos
-    """
-    file_path = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)),
-        "mocks",
-        "channel-videos.html.gz",
-    )
-    with gzip.open(file_path, "rb") as f:
-        return f.read().decode("utf-8")
 
 
 @pytest.fixture

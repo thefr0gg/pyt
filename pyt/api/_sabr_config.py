@@ -1,6 +1,6 @@
 """Internal: per-Video SABR session configuration.
 
-Replaces the legacy Monostate Borg pattern. Each Video owns one instance;
+Replaces the pytube-era ``Monostate`` Borg pattern. Each Video owns one instance;
 CombinedDownload and Download read from it directly.
 """
 

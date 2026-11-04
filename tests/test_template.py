@@ -20,10 +20,10 @@ def _yt(
 ):
     yt = mock.MagicMock()
     yt.title = title
-    yt.author = author
+    yt.author.name = author
     yt.video_id = video_id
-    yt.channel_id = channel_id
-    yt.publish_date = publish_date or datetime(2024, 3, 15)
+    yt.author.id = channel_id
+    yt.published_at = publish_date or datetime(2024, 3, 15)
     return yt
 
 

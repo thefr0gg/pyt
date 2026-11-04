@@ -20,6 +20,7 @@ from pyt.api.errors import (
     VideoUnavailable,
 )
 from pyt.api.models import Channel, Thumbnail, VideoMeta
+from pyt.captions import Caption
 from pyt.api.streams import StreamSet
 from pyt.api._sabr_config import _SabrConfig
 from pyt.api._streams_hydrator import hydrate_streams
@@ -109,6 +110,11 @@ class Video:
         return self._meta
 
     @property
+    def player_response(self) -> dict:
+        """The raw InnerTube player response this video was built from."""
+        return self._player_response
+
+    @property
     def video_id(self) -> str:
         return self._meta.video_id
 
@@ -143,6 +149,33 @@ class Video:
     @property
     def thumbnails(self) -> List[Thumbnail]:
         return list(self._meta.thumbnails)
+
+    @property
+    def thumbnail_url(self) -> str:
+        """URL of the largest thumbnail, falling back to YouTube's
+        ``maxresdefault`` image when the response carried none."""
+        thumbs = self._meta.thumbnails
+        if thumbs:
+            return thumbs[-1].url
+        return f"https://img.youtube.com/vi/{self.video_id}/maxresdefault.jpg"
+
+    @property
+    def captions(self) -> Dict[str, Caption]:
+        """Caption tracks keyed by language code (``"en"``, ``"a.en"`` for
+        auto-generated). Empty when the video has none."""
+        tracks = (
+            (self._player_response.get("captions") or {})
+            .get("playerCaptionsTracklistRenderer", {})
+            .get("captionTracks", [])
+        )
+        out: Dict[str, Caption] = {}
+        for track in tracks:
+            try:
+                caption = Caption(track)
+            except (KeyError, TypeError):
+                continue
+            out[caption.code] = caption
+        return out
 
     @property
     def is_live(self) -> bool:

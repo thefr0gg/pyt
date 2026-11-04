@@ -13,8 +13,8 @@ from mutagen.id3 import ID3, APIC, ID3NoHeaderError
 from pyt.postprocessors.ffmpeg import FFmpegPostProcessor
 
 if TYPE_CHECKING:
-    from pyt.streams import Stream
-    from pyt.__main__ import YouTube
+    from pyt.api.streams import StreamRef
+    from pyt.api.video import Video
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +31,8 @@ class EmbedThumbnailPostProcessor(FFmpegPostProcessor):
     MP3 uses ``mutagen`` for the APIC frame.
     """
 
-    def run(self, file_path: str, stream: "Stream", youtube: "YouTube") -> str:
-        thumb_url = youtube.thumbnail_url
+    def run(self, file_path: str, stream: "StreamRef", video: "Video") -> str:
+        thumb_url = video.thumbnail_url
         if not thumb_url:
             logger.warning("No thumbnail URL — skipping thumbnail embedding")
             return file_path

@@ -2,15 +2,11 @@
 
 :class:`Playlist` and :class:`ChannelFeed` fetch natively via InnerTube's
 ``browse`` endpoint (see :mod:`pyt.api._browse`) — they no longer
-delegate to the legacy ``pyt.contrib.{playlist,channel}`` HTML scrapers,
-which targeted renderer shapes (``gridRenderer``/``playlistVideoRenderer``)
-YouTube has since replaced with ``lockupViewModel`` items. That legacy
-code silently returned empty results against current responses rather
-than raising, which is the bug this rewrite fixes.
+use the pytube-era HTML scrapers, which targeted renderer shapes
+(``gridRenderer``/``playlistVideoRenderer``) YouTube has since replaced
+with ``lockupViewModel`` items.
 
-:class:`SearchResults` still wraps the legacy ``pyt.contrib.search``
-scraper; it wasn't part of this pass and may have the same kind of
-staleness — not yet confirmed.
+:class:`SearchResults` also calls InnerTube's ``search`` endpoint directly.
 
 Iterating ``ChannelFeed``/``Playlist`` yields modern :class:`Video`
 objects lazily: one HTTP fetch per video at iteration time, same as
@@ -19,7 +15,6 @@ before — only how the list of ids is obtained changed.
 
 from __future__ import annotations
 
-import warnings
 from typing import TYPE_CHECKING, Iterator, List, Optional
 
 from pyt.api._browse import (
@@ -186,19 +181,6 @@ class Playlist:
     def __repr__(self) -> str:
         return f"<Playlist id={self.playlist_id!r} title={self.title!r}>"
 
-    # ── legacy escape hatch ─────────────────────────────────────────────────
-
-    @property
-    def legacy(self):
-        """The pytube-era :class:`pyt.contrib.playlist.Playlist`, built
-        lazily on first access. Not used by any property above; kept
-        only for callers that relied on scraper-specific attributes."""
-        from pyt.contrib.playlist import Playlist as _LegacyPlaylist
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            return _LegacyPlaylist(self.url, proxies=self._client._proxies_dict())
-
 
 class ChannelFeed(Playlist):
     """A channel's "Videos" feed. Behaves like a :class:`Playlist`."""
@@ -268,63 +250,73 @@ class ChannelFeed(Playlist):
     def __repr__(self) -> str:
         return f"<ChannelFeed id={self.channel_id!r} name={self.name!r}>"
 
-    @property
-    def legacy(self):
-        """The pytube-era :class:`pyt.contrib.channel.Channel`, built
-        lazily on first access. Its ``.videos``/``.video_urls`` are
-        unreliable against current YouTube (see module docstring) —
-        kept only for callers that relied on other scraper-specific
-        attributes."""
-        from pyt.contrib.channel import Channel as _LegacyChannel
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            return _LegacyChannel(self.url, proxies=self._client._proxies_dict())
-
 
 class SearchResults:
     """A YouTube search result set.
 
     :class:`SearchResults` is *not* a :class:`Playlist` — search results
-    can mix videos, channels, and playlists, and YouTube returns them
-    paged via continuation tokens. We expose the first page as
-    :attr:`videos`; advanced paging is on the legacy object.
+    can mix videos, channels, and playlists. Only the video entries of the
+    first page are exposed, via :attr:`video_ids` / :attr:`videos`.
     """
 
-    def __init__(self, *, legacy, client: "Client"):
-        self._legacy = legacy
+    def __init__(self, *, query: str, client: "Client"):
+        self._query = query
         self._client = client
+        self._video_ids: Optional[List[str]] = None
 
     @classmethod
     def _from_query(cls, query: str, *, client: "Client") -> "SearchResults":
-        from pyt.contrib.search import Search as _LegacySearch
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            legacy = _LegacySearch(query)
-        return cls(legacy=legacy, client=client)
+        return cls(query=query, client=client)
 
     @property
     def query(self) -> str:
-        return self._legacy.query
+        return self._query
+
+    @property
+    def video_ids(self) -> List[str]:
+        """Video ids from the first page of results, in rank order."""
+        if self._video_ids is None:
+            raw = InnerTube(client="WEB").search(self._query)
+            self._video_ids = _search_video_ids(raw)
+        return list(self._video_ids)
 
     @property
     def videos(self) -> List["Video"]:
         """First page of video results, materialized as :class:`Video`."""
         out: List["Video"] = []
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            raw = list(self._legacy.results or [])
-        for legacy_yt in raw:
+        for video_id in self.video_ids:
             try:
-                out.append(self._client.video(legacy_yt.watch_url))
+                out.append(self._client.video(_watch_url(video_id)))
             except Exception:
                 continue
         return out
 
-    @property
-    def legacy(self):
-        return self._legacy
-
     def __repr__(self) -> str:
         return f"<SearchResults query={self.query!r}>"
+
+
+def _search_video_ids(raw: dict) -> List[str]:
+    """Collect ``videoRenderer`` ids from an InnerTube search response.
+
+    Walks the response rather than following a fixed path so a layout
+    change in the section list doesn't silently return nothing. Ads,
+    shelves, channels and playlists carry no ``videoRenderer`` of their
+    own at the top level and are skipped.
+    """
+    ids: List[str] = []
+
+    def walk(node) -> None:
+        if isinstance(node, dict):
+            renderer = node.get("videoRenderer")
+            if isinstance(renderer, dict) and renderer.get("videoId"):
+                if renderer["videoId"] not in ids:
+                    ids.append(renderer["videoId"])
+                return
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(raw.get("contents", raw))
+    return ids

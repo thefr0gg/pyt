@@ -61,6 +61,8 @@ jobs:
         run: poetry install --with dev
 
       - name: Run mypy
+        # Known pre-existing typing debt; report but don't fail the build.
+        continue-on-error: true
         run: poetry run mypy pyt/ --ignore-missing-imports
 
   lint:

@@ -1,10 +1,7 @@
 """Modern, ergonomic Python API for pyt.
 
-This package is the v1 of the redesigned developer interface described in
-the system-design proposal. It is **additive** — it sits on top of the
-existing :class:`pyt.YouTube`, :class:`pyt.Stream`, and post-processor
-internals without changing them. The legacy classes remain importable from
-``pyt`` for backwards compatibility.
+This package is pyt's public Python interface and the engine behind the
+``pyt`` command line.
 
 The design goals are:
 

@@ -2,14 +2,12 @@
 
 `video.download_best(...)` runs one adaptive video stream and one
 audio stream through a **single multiplexed SABR session**, then
-merges them with ffmpeg. This is what real YouTube players do — and
-unlike the legacy `Stream.download()` path which opens a fresh
-`SabrSession` per stream, YouTube treats both formats as one logical
-user with one playback cookie, one throttle decision, and one
-ad-enforcement context.
+merges them with ffmpeg. This is what real YouTube players do — opening
+a separate session per stream would make YouTube see two independent
+users, each with its own playback cookie, throttle decision, and
+ad-enforcement context. Here both formats share one logical user.
 
-Available only via the modern Python API (`pyt.Client`); the legacy
-`Stream.download()` path still opens a session per stream.
+The `pyt` command line uses this path for its default and `-f` downloads.
 
 ## Quick start
 

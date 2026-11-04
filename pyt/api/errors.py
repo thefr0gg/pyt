@@ -1,7 +1,6 @@
 """Typed error hierarchy for the modern pyt API.
 
-These wrap the legacy exceptions in :mod:`pyt.exceptions` so callers can
-write a single ``except PytError`` block. Every error carries enough
+Callers can write a single ``except PytError`` block. Every error carries enough
 identifying context (``video_id``, ``url``, ``client_used``) to file a
 useful bug report without further plumbing.
 """

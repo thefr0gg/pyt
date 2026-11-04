@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyt"
-version = "2.1.0"
+version = "3.0.0"
 description = "A maintained pytube fork for downloading YouTube videos."
 authors = ["ramsy0dev <ramsy0dev@gmail.com>"]
 readme = "README.md"
@@ -48,11 +48,10 @@ build-backend = "poetry.core.masonry.api"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 filterwarnings = [
-    # Legacy tests intentionally exercise the deprecated YouTube/Playlist/etc.
-    # surface, and the upscale tests intentionally fire the experimental
-    # FutureWarning. Silence both here so the suite stays readable; tests
-    # that explicitly assert on these use pytest.warns / catch_warnings,
-    # which work regardless of this filter.
+    # The upscale tests intentionally fire the experimental FutureWarning.
+    # Silence both here so the suite stays readable; tests that explicitly
+    # assert on these use pytest.warns / catch_warnings, which work
+    # regardless of this filter.
     "ignore::DeprecationWarning",
     "ignore::FutureWarning",
 ]

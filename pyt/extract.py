@@ -4,10 +4,9 @@ import re
 import logging
 import urllib.parse
 
-from collections import OrderedDict
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import parse_qs, quote, urlencode, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from pyt.cipher import Cipher
 from pyt.exceptions import HTMLParseError, LiveStreamError, RegexMatchError
@@ -38,42 +37,6 @@ def publish_date(watch_html: str):
     return datetime.strptime(result, "%Y-%m-%d")
 
 
-def recording_available(watch_html):
-    """Check if live stream recording is available.
-
-    :param str watch_html:
-        The html contents of the watch page.
-    :rtype: bool
-    :returns:
-        Whether or not the content is private.
-    """
-    unavailable_strings = ["This live stream recording is not available."]
-    for string in unavailable_strings:
-        if string in watch_html:
-            return False
-    return True
-
-
-def is_private(watch_html):
-    """Check if content is private.
-
-    :param str watch_html:
-        The html contents of the watch page.
-    :rtype: bool
-    :returns:
-        Whether or not the content is private.
-    """
-    private_strings = [
-        "This is a private video. Please sign in to verify that you may see it.",
-        '"simpleText":"Private video"',
-        "This video is private.",
-    ]
-    for string in private_strings:
-        if string in watch_html:
-            return True
-    return False
-
-
 def is_age_restricted(watch_html: str) -> bool:
     """Check if content is age restricted.
 
@@ -88,32 +51,6 @@ def is_age_restricted(watch_html: str) -> bool:
     except RegexMatchError:
         return False
     return True
-
-
-def playability_status(watch_html: str) -> tuple[str, str]:
-    """Return the playability status and status explanation of a video.
-
-    For example, a video may have a status of LOGIN_REQUIRED, and an explanation
-    of "This is a private video. Please sign in to verify that you may see it."
-
-    This explanation is what gets incorporated into the media player overlay.
-
-    :param str watch_html:
-        The html contents of the watch page.
-    :rtype: bool
-    :returns:
-        Playability status and reason of the video.
-    """
-    player_response = initial_player_response(watch_html)
-    status_dict = player_response.get("playabilityStatus", {})
-    if "liveStreamability" in status_dict:
-        return "LIVE_STREAM", "Video is a live stream."
-    if "status" in status_dict:
-        if "reason" in status_dict:
-            return status_dict["status"], [status_dict["reason"]]
-        if "messages" in status_dict:
-            return status_dict["status"], status_dict["messages"]
-    return None, [None]
 
 
 def video_id(url: str) -> str:
@@ -184,68 +121,6 @@ def channel_name(url: str) -> str:
             return f"/{uri_style}/{uri_identifier}"
 
     raise RegexMatchError(caller="channel_name", pattern="patterns")
-
-
-def video_info_url(video_id: str, watch_url: str) -> str:
-    """Construct the video_info url.
-
-    :param str video_id:
-        A YouTube video identifier.
-    :param str watch_url:
-        A YouTube watch url.
-    :rtype: str
-    :returns:
-        :samp:`https://youtube.com/get_video_info` with necessary GET
-        parameters.
-    """
-    params = OrderedDict(
-        [
-            ("video_id", video_id),
-            ("ps", "default"),
-            ("eurl", quote(watch_url)),
-            ("hl", "en_US"),
-            ("html5", "1"),
-            ("c", "TVHTML5"),
-            ("cver", "7.20201028"),
-        ]
-    )
-    return _video_info_url(params)
-
-
-def video_info_url_age_restricted(video_id: str, embed_html: str) -> str:
-    """Construct the video_info url.
-
-    :param str video_id:
-        A YouTube video identifier.
-    :param str embed_html:
-        The html contents of the embed page (for age restricted videos).
-    :rtype: str
-    :returns:
-        :samp:`https://youtube.com/get_video_info` with necessary GET
-        parameters.
-    """
-    try:
-        sts = regex_search(r'"sts"\s*:\s*(\d+)', embed_html, group=1)
-    except RegexMatchError:
-        sts = ""
-    # Here we use ``OrderedDict`` so that the output is consistent between
-    # Python 2.7+.
-    eurl = f"https://youtube.googleapis.com/v/{video_id}"
-    params = OrderedDict(
-        [
-            ("video_id", video_id),
-            ("eurl", eurl),
-            ("sts", sts),
-            ("html5", "1"),
-            ("c", "TVHTML5"),
-            ("cver", "7.20201028"),
-        ]
-    )
-    return _video_info_url(params)
-
-
-def _video_info_url(params: OrderedDict) -> str:
-    return "https://www.youtube.com/get_video_info?" + urlencode(params)
 
 
 def js_url(html: str) -> str:

@@ -29,7 +29,7 @@ PathLike = Union[str, Path]
 class ProgressEvent:
     """Returned to user-supplied callbacks.
 
-    For now only the legacy chunk-based progress is exposed. Once the
+    For now only chunk-based progress is exposed. Once the
     transport moves to httpx we'll add ``Started``, ``Completed``, and
     ``Error`` variants as separate types so callers can pattern-match.
     """

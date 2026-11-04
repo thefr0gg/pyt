@@ -3,10 +3,8 @@ import os
 from unittest import mock
 from unittest.mock import MagicMock, mock_open, patch
 
-import pytest
 from pyt import captions
 from pyt.captions import Caption
-from pyt.query import CaptionQuery
 
 
 def test_float_to_srt_time_format():
@@ -19,75 +17,6 @@ def test_float_to_srt_time_format():
         }
     )
     assert caption1.float_to_srt_time_format(3.89) == "00:00:03,890"
-
-
-def test_caption_query_sequence():
-    caption1 = Caption(
-        {
-            "url": "url1",
-            "name": {"simpleText": "name1"},
-            "languageCode": "en",
-            "vssId": ".en",
-        }
-    )
-    caption2 = Caption(
-        {
-            "url": "url2",
-            "name": {"simpleText": "name2"},
-            "languageCode": "fr",
-            "vssId": ".fr",
-        }
-    )
-    caption_query = CaptionQuery(captions=[caption1, caption2])
-    assert len(caption_query) == 2
-    assert caption_query["en"] == caption1
-    assert caption_query["fr"] == caption2
-    with pytest.raises(KeyError):
-        assert caption_query["nada"] is not None
-
-
-def test_caption_query_get_by_language_code_when_exists():
-    caption1 = Caption(
-        {
-            "url": "url1",
-            "name": {"simpleText": "name1"},
-            "languageCode": "en",
-            "vssId": ".en",
-        }
-    )
-    caption2 = Caption(
-        {
-            "url": "url2",
-            "name": {"simpleText": "name2"},
-            "languageCode": "fr",
-            "vssId": ".fr",
-        }
-    )
-    caption_query = CaptionQuery(captions=[caption1, caption2])
-    assert caption_query["en"] == caption1
-
-
-def test_caption_query_get_by_language_code_when_not_exists():
-    caption1 = Caption(
-        {
-            "url": "url1",
-            "name": {"simpleText": "name1"},
-            "languageCode": "en",
-            "vssId": ".en",
-        }
-    )
-    caption2 = Caption(
-        {
-            "url": "url2",
-            "name": {"simpleText": "name2"},
-            "languageCode": "fr",
-            "vssId": ".fr",
-        }
-    )
-    caption_query = CaptionQuery(captions=[caption1, caption2])
-    with pytest.raises(KeyError):
-        assert caption_query["hello"] is not None
-        # assert not_found is not None  # should never reach here
 
 
 @mock.patch("pyt.captions.Caption.generate_srt_captions")
@@ -177,9 +106,6 @@ def test_repr():
         }
     )
     assert str(caption) == '<Caption lang="name1" code="en">'
-
-    caption_query = CaptionQuery(captions=[caption])
-    assert repr(caption_query) == '{\'en\': <Caption lang="name1" code="en">}'
 
 
 @mock.patch("pyt.request.get")

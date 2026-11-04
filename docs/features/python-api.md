@@ -1,13 +1,10 @@
 # Modern Python API
 
-`pyt.Client` is the modern Python interface (debuted in 2.0). The legacy `pyt.YouTube`,
-`pyt.Playlist`, and friends still work but emit `DeprecationWarning`
-and will be removed from the top-level namespace in a future major
-release. New code should use `Client`.
+`pyt.Client` is the modern Python interface (debuted in 2.0). The pytube-era `YouTube`, `Playlist` and friends were removed in v3.
 
 ## Why the new API exists
 
-The legacy interface had several footguns:
+The pytube-era interface had several footguns:
 
 * **Hidden network I/O on attribute access.** `yt.title` could fire
   HTTP requests; surprises in async code, hard to mock, hard to
@@ -90,9 +87,6 @@ video.hls_manifest_url   # Optional[str] — HLS URL when is_live is True
 
 # Age gate
 video.is_age_restricted  # bool — True when age verification is required
-
-video.legacy             # the underlying pyt.YouTube — escape hatch
-                         # for anything not yet on the modern surface
 ```
 
 ## StreamSet
@@ -277,7 +271,7 @@ The modern API is sync-only at the moment. Async support is on the
 roadmap but requires moving the request layer to `httpx` and
 threading through SABR — substantial work that hasn't landed yet.
 
-## Migration from the legacy API
+## Migrating from pytube-era `pyt`
 
 | Old | New |
 |---|---|
@@ -292,15 +286,3 @@ threading through SABR — substantial work that hasn't landed yet.
 | `Search(query)` | `Client().search(query)` |
 | Manual PP chain | `download \| pp.sponsorblock(...) \| pp.embed_metadata()` |
 | `from pyt.exceptions import …` | `from pyt import PytError, VideoUnavailable, NoMatchingStream, …` |
-
-To silence the deprecation warnings while you migrate:
-
-```python
-import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"pyt\..*")
-```
-
-…or import explicitly from `pyt.legacy` (`from pyt.legacy import
-YouTube`) so it's grep-able which call sites are still on the old
-surface. `pyt.legacy.*` will outlive the top-level removal by one
-more release cycle.

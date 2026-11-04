@@ -7,13 +7,9 @@ import shutil
 import logging
 import subprocess
 import tempfile
-from typing import List, TYPE_CHECKING
+from typing import List
 
 from pyt.postprocessors.base import BasePostProcessor, PostProcessorError
-
-if TYPE_CHECKING:
-    from pyt.streams import Stream
-    from pyt.__main__ import YouTube
 
 logger = logging.getLogger(__name__)
 

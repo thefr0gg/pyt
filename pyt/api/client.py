@@ -2,9 +2,7 @@
 
 Construct one ``Client`` per "user" (process, FastAPI app, notebook). It
 holds the proxy config, cookies, OAuth flag, and PO token, and produces
-:class:`Video` instances. The legacy :class:`pyt.YouTube` global state
-(``pyt.__js__``, ``pyt.__js_url__``, ``Monostate``) is still touched
-internally — fully decoupling from it is a v3 task.
+:class:`Video` instances.
 """
 
 from __future__ import annotations
@@ -156,8 +154,7 @@ class Client:
             return self._po_token_provider.get()
         except ConfigError as exc:
             logger.warning(
-                "client: po_token provider '%s' failed (%s); "
-                "falling back to no token",
+                "client: po_token provider '%s' failed (%s); falling back to no token",
                 self._po_token_provider.name,
                 exc,
             )
@@ -210,13 +207,18 @@ class Client:
         return {"http": self._proxy, "https": self._proxy}
 
     def _ensure_cookies_installed(self) -> None:
-        """Cookies are installed once per client. The legacy hook patches
-        the module-level :func:`pyt.request._execute_request` — that's a
-        global mutation we inherit from the old code path. v3 will lift
-        this onto the client itself.
+        """Proxy and cookies are installed once per client. Both patch
+        process-wide state (urllib's default opener and
+        :func:`pyt.request._execute_request`), so the last client to
+        install wins.
         """
         if self._cookies_installed:
             return
+        proxies = self._proxies_dict()
+        if proxies:
+            from pyt.helpers import install_proxy
+
+            install_proxy(proxies)
         if not (self._cookies_path or self._cookies_browser):
             self._cookies_installed = True
             return

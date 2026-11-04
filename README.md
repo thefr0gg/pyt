@@ -43,7 +43,6 @@ for YouTube-specific use cases.
 | Tier | What's in it |
 |---|---|
 | **Stable** | All download, post-processing, playlist, search, cookie, proxy, archive features. CLI flags. The `pyt.Client` / `Video` / `Stream` / pipeline modern Python API. The doctor command. |
-| **Deprecated** | `pyt.YouTube`, `pyt.Playlist`, `pyt.Channel`, `pyt.Search`, `register_on_*_callback`. Still works in 2.x; emits `DeprecationWarning`. Will be removed from the top-level namespace in v3 — `from pyt.legacy import ...` is the explicit-import path that survives. |
 | **Experimental** | `pp.upscale(...)` — both `algorithm="lanczos"` and `algorithm="realesrgan"`. Emits `FutureWarning` on first use; API and defaults may change. |
 
 ---
@@ -377,12 +376,11 @@ Every modern API failure inherits from `pyt.PytError`:
 | `PostProcessError` | a pipeline step failed |
 | `ConfigError` | invalid `Client(...)` argument |
 
-### Migrating from the legacy API
+### Migrating from the pytube-era API
 
-The original `YouTube` / `Playlist` / `Channel` / `Search` /
-`StreamQuery` / `register_on_*_callback` classes now emit a
-`DeprecationWarning`. They still work — the new API is a thin facade
-over them — but new code should use `pyt.Client`.
+The pytube-era `YouTube` / `Playlist` / `Channel` / `Search` /
+`StreamQuery` classes, the `register_on_*_callback` hooks, and the
+`pyt.legacy` shim were removed in v3. Use `pyt.Client`:
 
 | Old | New |
 |---|---|
@@ -398,26 +396,6 @@ over them — but new code should use `pyt.Client`.
 | Manual PP chain (`SponsorBlockPP(...).run(p, s, yt)` …) | `download \| pp.sponsorblock(...) \| pp.embed_metadata()` |
 | `from pyt.exceptions import …` | `from pyt import PytError, VideoUnavailable, NoMatchingStream, …` |
 
-Need something the new surface doesn't expose? Every wrapper has a
-`.legacy` escape hatch (`video.legacy`, `stream.legacy`,
-`playlist.legacy`) that returns the underlying old object.
-
-To silence the deprecation warnings while you migrate, either filter
-them in your code:
-
-```python
-import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"pyt\..*")
-```
-
-…or import explicitly from the `pyt.legacy` namespace
-(`from pyt.legacy import YouTube`) so it's grep-able which call sites
-are still on the old surface.
-
-The legacy classes are removed from the top-level `pyt` namespace
-in v3; `pyt.legacy.*` will outlive that release by one more cycle to
-keep migration windows reasonable. Throughout 2.x they continue to
-work and only emit `DeprecationWarning`.
 
 ---
 
@@ -599,9 +577,7 @@ grew enough that calling it out seemed worth it:
 - **Multi-format download orchestrator.** `video.download_best(...)` (or
   construct `pyt.CombinedDownload` directly) runs video+audio over a
   single multiplexed SABR session, with a byte-range fallback for whatever
-  bytes SABR doesn't deliver. The legacy `Stream.download()` path still
-  opens one session per stream; no plans to back-port — migrate to
-  `Client.video(...).download_best(...)`.
+  bytes SABR doesn't deliver.
 - **Tests on recorded UMP fixtures.** The SABR + UMP layers have 90+
   fixture-driven tests covering single-format completion, multi-format
   multiplex, attestation, redirects, error-then-refresh, ad-scope backoff

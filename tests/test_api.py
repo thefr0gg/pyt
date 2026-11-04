@@ -134,7 +134,7 @@ def _fake_raw_streams():
 
 
 def _make_video(cipher_signature):
-    """Build a v3 :class:`Video` from the legacy fixture without network calls."""
+    """Build a v3 :class:`Video` from a recorded fixture without network calls."""
     from pyt.api.streams import StreamSet
     from pyt.api._sabr_config import _SabrConfig
 
@@ -442,49 +442,6 @@ def test_pipeline_steps_are_named():
     assert pp.sponsorblock(mark=["sponsor"]).name == "sponsorblock"
 
 
-# ── Deprecation warnings ───────────────────────────────────────────────────
-
-
-def test_legacy_youtube_emits_deprecation_warning():
-    from pyt.legacy import YouTube
-
-    with mock.patch("pyt.extract.video_id", return_value="abc"):
-        with pytest.warns(DeprecationWarning, match="pyt.Client"):
-            YouTube("https://youtu.be/abc")
-
-
-def test_legacy_playlist_emits_deprecation_warning():
-    from pyt.legacy import Playlist
-
-    with pytest.warns(DeprecationWarning, match="pyt.Client"):
-        Playlist("https://youtube.com/playlist?list=PLxxx")
-
-
-def test_legacy_channel_emits_deprecation_warning():
-    from pyt.legacy import Channel as LegacyChannel
-
-    with mock.patch("pyt.contrib.playlist.extract.playlist_id", return_value="xxx"):
-        with pytest.warns(DeprecationWarning, match="pyt.Client"):
-            LegacyChannel("https://www.youtube.com/@somechannel")
-
-
-def test_legacy_search_emits_deprecation_warning():
-    from pyt.legacy import Search
-
-    with pytest.warns(DeprecationWarning, match="pyt.Client"):
-        Search("test")
-
-
-def test_register_on_progress_callback_emits_deprecation_warning(cipher_signature):
-    with pytest.warns(DeprecationWarning, match="register_on_progress"):
-        cipher_signature.register_on_progress_callback(lambda *a, **k: None)
-
-
-def test_register_on_complete_callback_emits_deprecation_warning(cipher_signature):
-    with pytest.warns(DeprecationWarning, match="register_on_complete"):
-        cipher_signature.register_on_complete_callback(lambda *a, **k: None)
-
-
 def test_client_video_does_not_emit_deprecation_warning():
     """The modern API path must not surface a DeprecationWarning."""
     import warnings as warnings_mod
@@ -500,26 +457,14 @@ def test_client_video_does_not_emit_deprecation_warning():
         }
     }
 
-    with mock.patch("pyt.api._player.fetch_player_response") as mock_fetch, mock.patch(
-        "pyt.extract.video_id", return_value="dQw4w9WgXcQ"
+    with (
+        mock.patch("pyt.api._player.fetch_player_response") as mock_fetch,
+        mock.patch("pyt.extract.video_id", return_value="dQw4w9WgXcQ"),
     ):
         mock_fetch.return_value = (fake_pr, "ANDROID_VR", {}, False)
         with warnings_mod.catch_warnings():
             warnings_mod.simplefilter("error", DeprecationWarning)
             Client().video("https://youtu.be/dQw4w9WgXcQ")
-
-
-# ── pyt.legacy facade ─────────────────────────────────────────────────────
-
-
-def test_legacy_module_re_exports_classes():
-    from pyt import legacy
-
-    assert legacy.YouTube is __import__("pyt.__main__", fromlist=["YouTube"]).YouTube
-    assert hasattr(legacy, "Stream")
-    assert hasattr(legacy, "Playlist")
-    assert hasattr(legacy, "Channel")
-    assert hasattr(legacy, "Search")
 
 
 # ── Modern Playlist / SearchResults shape ──────────────────────────────────
@@ -567,9 +512,10 @@ def test_client_channel_returns_channel_feed():
 
     fake_home = {"metadata": {"channelMetadataRenderer": {"title": "Some Channel"}}}
 
-    with mock.patch(
-        "pyt.api.playlists.resolve_channel_id", return_value="UCxxx"
-    ), mock.patch("pyt.innertube.InnerTube.browse", return_value=fake_home):
+    with (
+        mock.patch("pyt.api.playlists.resolve_channel_id", return_value="UCxxx"),
+        mock.patch("pyt.innertube.InnerTube.browse", return_value=fake_home),
+    ):
         result = Client().channel("https://youtube.com/@someone")
 
         assert isinstance(result, ChannelFeed)
@@ -581,14 +527,52 @@ def test_client_search_returns_modern_wrapper():
     from pyt.api.playlists import SearchResults
     from pyt import Client
 
-    fake_legacy = mock.MagicMock()
-    fake_legacy.query = "rickroll"
-
-    with mock.patch("pyt.contrib.search.Search", return_value=fake_legacy):
-        result = Client().search("rickroll")
+    result = Client().search("rickroll")
 
     assert isinstance(result, SearchResults)
     assert result.query == "rickroll"
+
+
+def test_search_results_collects_video_ids_from_response():
+    from pyt.api.playlists import SearchResults
+
+    fake_response = {
+        "contents": {
+            "twoColumnSearchResultsRenderer": {
+                "primaryContents": {
+                    "sectionListRenderer": {
+                        "contents": [
+                            {
+                                "itemSectionRenderer": {
+                                    "contents": [
+                                        {"videoRenderer": {"videoId": "aaa"}},
+                                        {"channelRenderer": {"channelId": "UC1"}},
+                                        {"shelfRenderer": {}},
+                                        {"videoRenderer": {"videoId": "bbb"}},
+                                        {"videoRenderer": {"videoId": "aaa"}},
+                                    ]
+                                }
+                            },
+                            {"continuationItemRenderer": {}},
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    fake_client = mock.MagicMock()
+    fake_client.video.side_effect = lambda u: f"video<{u}>"
+
+    results = SearchResults(query="q", client=fake_client)
+    with mock.patch(
+        "pyt.api.playlists.InnerTube.search", return_value=fake_response
+    ) as search:
+        assert results.video_ids == ["aaa", "bbb"]
+        assert results.videos == [
+            "video<https://www.youtube.com/watch?v=aaa>",
+            "video<https://www.youtube.com/watch?v=bbb>",
+        ]
+    search.assert_called_once_with("q")  # second access is served from cache
 
 
 # ── Live stream / VOD / upcoming ───────────────────────────────────────────
@@ -682,9 +666,10 @@ def test_record_live_calls_ffmpeg(tmp_path):
         player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={}
     )
 
-    with mock.patch(
-        "pyt.api.video.shutil.which", return_value="/usr/bin/ffmpeg"
-    ), mock.patch("pyt.api.video.subprocess.run") as mock_run:
+    with (
+        mock.patch("pyt.api.video.shutil.which", return_value="/usr/bin/ffmpeg"),
+        mock.patch("pyt.api.video.subprocess.run") as mock_run,
+    ):
         mock_run.return_value = mock.Mock(returncode=0)
         result = video.record_live(output_path=str(tmp_path))
 
@@ -706,9 +691,10 @@ def test_record_live_passes_timeout(tmp_path):
         player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={}
     )
 
-    with mock.patch(
-        "pyt.api.video.shutil.which", return_value="/usr/bin/ffmpeg"
-    ), mock.patch("pyt.api.video.subprocess.run") as mock_run:
+    with (
+        mock.patch("pyt.api.video.shutil.which", return_value="/usr/bin/ffmpeg"),
+        mock.patch("pyt.api.video.subprocess.run") as mock_run,
+    ):
         mock_run.return_value = mock.Mock(returncode=0)
         video.record_live(output_path=str(tmp_path), timeout=60)
 
@@ -806,3 +792,116 @@ def test_hydrate_meta_sets_is_age_restricted(cipher_signature):
         url="https://youtube.com/watch?v=2lAe1cqCOXo",
     )
     assert meta.is_age_restricted is False
+
+
+# ── Video.captions / thumbnail_url / player_response ──────────────────────
+
+
+def _bare_video(**extra):
+    pr = _make_player_response()
+    pr.update(extra)
+    pr["videoDetails"]["videoId"] = "abc"
+    meta = _hydrate_meta(pr, url="https://youtu.be/abc")
+    return Video(player_response=pr, meta=meta, client_name="ANDROID_VR", client_cfg={})
+
+
+def test_video_captions_keyed_by_language_code():
+    video = _bare_video(
+        captions={
+            "playerCaptionsTracklistRenderer": {
+                "captionTracks": [
+                    {
+                        "baseUrl": "u1",
+                        "name": {"simpleText": "English"},
+                        "vssId": ".en",
+                    },
+                    {
+                        "baseUrl": "u2",
+                        "name": {"runs": [{"text": "English (auto-generated)"}]},
+                        "vssId": "a.en",
+                    },
+                    {"baseUrl": "u3", "name": {"simpleText": "no vssId"}},  # skipped
+                ]
+            }
+        }
+    )
+    captions = video.captions
+    assert set(captions) == {"en", "a.en"}
+    assert captions["en"].name == "English"
+    assert captions["a.en"].url == "u2"
+
+
+def test_video_captions_empty_when_absent():
+    assert _bare_video().captions == {}
+
+
+def test_video_thumbnail_url_is_largest():
+    video = _bare_video(
+        videoDetails={
+            **_make_player_response()["videoDetails"],
+            "thumbnail": {
+                "thumbnails": [
+                    {"url": "https://t/small.jpg", "width": 1, "height": 1},
+                    {"url": "https://t/large.jpg", "width": 9, "height": 9},
+                ]
+            },
+        }
+    )
+    assert video.thumbnail_url == "https://t/large.jpg"
+
+
+def test_video_thumbnail_url_falls_back_to_maxres():
+    assert (
+        _bare_video().thumbnail_url
+        == "https://img.youtube.com/vi/abc/maxresdefault.jpg"
+    )
+
+
+def test_video_player_response_is_the_raw_response():
+    video = _bare_video()
+    assert video.player_response["videoDetails"]["videoId"] == "abc"
+
+
+# ── Client proxy ──────────────────────────────────────────────────────────
+
+
+def test_client_installs_proxy_once():
+    from pyt import Client
+
+    client = Client(proxy="http://127.0.0.1:8080")
+    with mock.patch("pyt.helpers.install_proxy") as install:
+        client._ensure_cookies_installed()
+        client._ensure_cookies_installed()
+    install.assert_called_once_with(
+        {"http": "http://127.0.0.1:8080", "https": "http://127.0.0.1:8080"}
+    )
+
+
+def test_client_without_proxy_installs_nothing():
+    from pyt import Client
+
+    with mock.patch("pyt.helpers.install_proxy") as install:
+        Client()._ensure_cookies_installed()
+    install.assert_not_called()
+
+
+# ── Pipeline steps receive the modern objects ─────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "step, target",
+    [
+        (pp.sponsorblock(mark=["sponsor"]), "SponsorBlockPP"),
+        (pp.embed_metadata(), "FFmpegMetadataEmbedder"),
+        (pp.embed_thumbnail(), "EmbedThumbnailPostProcessor"),
+        (pp.embed_subtitles(), "EmbedSubtitlePostProcessor"),
+        (pp.extract_audio(), "AudioExtractor"),
+    ],
+)
+def test_pipeline_step_passes_stream_and_video_to_post_processor(step, target):
+    stream, video = mock.MagicMock(), mock.MagicMock()
+    with mock.patch(f"pyt.api.pipeline.{target}") as processor_cls:
+        processor_cls.return_value.run.return_value = "out.mp4"
+        result = step.apply("in.mp4", stream=stream, video=video)
+    processor_cls.return_value.run.assert_called_once_with("in.mp4", stream, video)
+    assert result == "out.mp4"

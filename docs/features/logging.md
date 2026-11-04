@@ -46,9 +46,8 @@ pyt <url> -vv      # TRACE
 pyt <url> -v --logfile /tmp/pyt.log
 ```
 
-Both `-v` and the `--logfile` flag continue to work the way they always
-have on the legacy CLI; under the hood they now also enable the modern
-`pyt.api` logging path so messages from both layers come out together.
+`-v` and `--logfile` route through the same `pyt.api` logging path that
+`enable_logging()` controls, so CLI and library messages come out together.
 
 ## Environment variable
 
@@ -71,7 +70,7 @@ misconfigured environment variable.
 $ PYT_LOG_LEVEL=DEBUG python -c "import pyt; pyt.Client().video('https://youtu.be/dQw4w9WgXcQ').download_best('./').run()"
 14:32:01 DEBUG   pyt.api.client :: Client init: proxy=False cookies=False cookies_from_browser=None po_token=unset oauth=False on_progress=unset on_complete=unset
 14:32:01 INFO    pyt.api.client :: client.video: fetching https://youtu.be/dQw4w9WgXcQ
-14:32:02 DEBUG   pyt.api.video  :: Video._from_url: legacy YouTube ctor OK, video_id=dQw4w9WgXcQ
+14:32:02 DEBUG   pyt.api.video  :: Video._from_url: player response OK video_id=dQw4w9WgXcQ client=ANDROID_VR
 14:32:02 INFO    pyt.api.client :: client.video: dQw4w9WgXcQ hydrated in 1.45s (title='Rick Astley - Never Gonna Give You Up' length=0:03:32)
 14:32:02 DEBUG   pyt.api.video  :: video.streams: hydrating stream catalog for dQw4w9WgXcQ
 14:32:02 INFO    pyt.api.video  :: video.streams: dQw4w9WgXcQ catalog has 24 streams

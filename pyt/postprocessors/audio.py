@@ -11,8 +11,8 @@ from pyt.postprocessors.ffmpeg import FFmpegPostProcessor, PostProcessorError
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from pyt.streams import Stream
-    from pyt.__main__ import YouTube
+    from pyt.api.streams import StreamRef
+    from pyt.api.video import Video
 
 # Maps user-facing format name → (ffmpeg codec, file extension)
 _CODEC_MAP = {
@@ -55,7 +55,7 @@ class AudioExtractor(FFmpegPostProcessor):
         self._codec, self._ext = _CODEC_MAP[fmt]
         self._quality = quality
 
-    def run(self, file_path: str, stream: "Stream", youtube: "YouTube") -> str:
+    def run(self, file_path: str, stream: "StreamRef", video: "Video") -> str:
         base, _original_ext = os.path.splitext(file_path)
         out_path = base + self._ext
 

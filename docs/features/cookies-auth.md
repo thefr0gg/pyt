@@ -72,7 +72,7 @@ video.streams.audio.best().download_to("downloads/").run()
 Cookies are installed once per `Client` instance and apply to every
 video fetched through it.
 
-## Python API (legacy)
+## Low-level cookie helpers
 
 ```python
 from pyt.cookies import install_cookies, load_cookies_from_file, load_cookies_from_browser
@@ -86,8 +86,8 @@ jar = load_cookies_from_browser("firefox")
 install_cookies(jar)
 ```
 
-`install_cookies()` must be called before any `YouTube` object is created.
-Prefer the modern `Client(cookies_from_browser=...)` path for new code.
+`install_cookies()` must be called before any video is fetched.
+Prefer `Client(cookies_from_browser=...)`, which installs them for you.
 
 ## Cookie File Format
 

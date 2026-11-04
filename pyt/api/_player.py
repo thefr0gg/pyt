@@ -1,4 +1,4 @@
-"""Internal: fetch a YouTube player response without the legacy YouTube class."""
+"""Internal: fetch a YouTube player response directly from InnerTube."""
 
 from __future__ import annotations
 

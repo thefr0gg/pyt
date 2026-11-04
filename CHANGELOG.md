@@ -1,5 +1,54 @@
 # Changelog
 
+## 3.0.0 — 2026-11-04
+
+The pytube-era API is gone. `pyt.Client` is the only Python entry point, and
+the `pyt` command line now runs on it too.
+
+### Removed
+
+- **`pyt.legacy`** (the v2 compatibility shim) and the classes behind it:
+  `YouTube`, `Stream`, `StreamQuery`, `CaptionQuery`, `Monostate`,
+  `Playlist`, `Channel` and `Search` (`pyt.contrib.*`). See the migration
+  table in the README.
+- **`.legacy` escape hatches** on `Playlist`, `ChannelFeed` and
+  `SearchResults`.
+- **`pyt.helpers.create_mock_html_json`** / `generate_all_html_json_mocks`,
+  which regenerated fixtures through the removed `YouTube` class.
+- Exception types nothing raised any more: `AgeRestrictedError`,
+  `VideoPrivate`, `RecordingUnavailable`, `MembersOnly`, `VideoRegionBlocked`
+  (use `pyt.AgeRestricted` / `pyt.VideoUnavailable`).
+- `extract.playability_status`, `video_info_url`,
+  `video_info_url_age_restricted`, `recording_available`, `is_private`.
+
+### Changed
+
+- **The CLI runs on `pyt.Client`.** Single videos, playlists and channels all
+  go through `Client`; merged downloads (default and `-f`) use
+  `CombinedDownload`, so both tracks share one SABR session. If the merged
+  download fails, the CLI still falls back to the best progressive stream.
+  `--build-playback-report` now dumps the player response (`video_info`);
+  it no longer contains `js` / `watch_html`.
+- **Post-processors and `OutputTemplate` take `Video` / `StreamRef`.**
+  `PostProcessor.run(path, stream, video)` and
+  `OutputTemplate.render(video, stream, ...)` read `video.author.name`,
+  `video.published_at` and `video.author.id`.
+- `python -m pyt` now runs the CLI.
+
+### Fixed
+
+- **`pyt.api.pipeline` steps were broken.** They passed `stream.legacy` /
+  `video.legacy`, which the modern `Video` / `StreamRef` never defined.
+- **`Client(proxy=...)` had no effect.** The proxy was computed but never
+  installed; it is now installed when the client first fetches.
+- **`Client.search()`** no longer goes through the HTML-era scraper; it reads
+  `videoRenderer` entries from InnerTube's `search` response.
+
+### Added
+
+- `Video.captions`, `Video.thumbnail_url` and `Video.player_response`.
+- `SearchResults.video_ids`.
+
 ## 2.1.0 — 2026-05-09
 
 ### Fixed

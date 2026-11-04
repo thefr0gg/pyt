@@ -1,9 +1,8 @@
 """Multi-format SABR download: drive one :class:`SabrSession` for an
 adaptive video stream + an audio stream, then merge with ffmpeg.
 
-Today the legacy :meth:`pyt.Stream.download` opens a fresh ``SabrSession``
-per stream, so a single 1080p+audio download fans out to two parallel
-SABR exchanges. Each session gets its own throttle decisions, its own
+Downloading each stream through its own ``SabrSession`` would fan a single
+1080p+audio download out to two parallel SABR exchanges. Each session gets its own throttle decisions, its own
 ad-enforcement context, and its own playback cookie — and YouTube's SABR
 server treats them as independent users. Multiplexing both formats over
 one session is what real players do; the underlying :class:`SabrSession`
@@ -171,7 +170,7 @@ class CombinedDownload:
                 self._drive_sabr_session(parts)
             except AttestationRequired as exc:
                 # If the Client has a po_token provider, ask it for a
-                # fresh token, update the legacy monostate, and retry
+                # fresh token, update the SABR config, and retry
                 # the SABR session once. We rebuild the part files
                 # (truncate + reopen) to start fresh — yt-dlp does the
                 # same on PO-token-driven retries.
@@ -227,7 +226,7 @@ class CombinedDownload:
             raise
 
         # Pipeline steps run on the merged file with the *video* stream as
-        # context, matching the legacy CLI behavior in `_run_pp_chain`.
+        # context, matching the CLI's `_run_pp_chain`.
         path: Union[str, Path] = final_path
         for step in self._steps:
             try:
@@ -325,8 +324,7 @@ class CombinedDownload:
             # Translate to the typed AttestationRequired error so the
             # caller can refresh a PO token and retry.
             logger.info(
-                "CombinedDownload: ATTESTATION_REQUIRED on itag=%d/%d "
-                "for video_id=%s",
+                "CombinedDownload: ATTESTATION_REQUIRED on itag=%d/%d for video_id=%s",
                 self._video_stream.itag,
                 self._audio_stream.itag,
                 self._video.video_id,

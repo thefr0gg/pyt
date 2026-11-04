@@ -83,8 +83,7 @@ path = (
 | Tier | Features | Notes |
 |---|---|---|
 | **Stable** | All download / merge / metadata / thumbnail / subtitle / SponsorBlock / playlist / search / cookie / proxy / archive features; doctor command | Public API, semver applies |
-| **Stable (modern)** | `pyt.Client`, `Video`, `StreamSet`, `Download`, `CombinedDownload`, `pipeline.*` | Replaces the deprecated `pyt.YouTube`/`Playlist`/`Channel`/`Search` classes |
-| **Deprecated** | `pyt.YouTube`, `pyt.Playlist`, `pyt.Channel`, `pyt.Search`, `register_on_*_callback` | Still works in 2.x; emits `DeprecationWarning`. Top-level removal targets v3 — `from pyt.legacy import ...` stays available |
+| **Stable (modern)** | `pyt.Client`, `Video`, `StreamSet`, `Download`, `CombinedDownload`, `pipeline.*` | Replaces the pytube-era `YouTube`/`Playlist`/`Channel`/`Search` classes, removed in v3 |
 | **Experimental** | `pp.upscale(...)` (both `algorithm="lanczos"` and `algorithm="realesrgan"`) | API and defaults may change. Emits `FutureWarning` on first use |
 
 ## Feature Documentation
